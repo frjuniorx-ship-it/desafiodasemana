@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import NPCCard from './NPCCard';
-// TODO: trocar por getDesafios() quando endpoint /desafios estiver pronto no WordPress
-import { getDesafiosMock as fetchDesafios } from '../api/mocks/desafios.js';
+import { getDesafios as fetchDesafios } from '../api/desafios.js';
 import { getCartas } from '../api/cartas.js';
 import { useProgress } from '../useProgress';
 import { darkenHex } from '../utils';
