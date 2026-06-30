@@ -1,11 +1,47 @@
+import { useState, useEffect } from 'react';
 import NPCCard from './NPCCard';
-import { npcs } from '../data';
+import { fetchDesafios } from '../api';
+import { useProgress } from '../useProgress';
+import { darkenHex } from '../utils';
+
+function normalizeNpc(apiNpc, state, date) {
+  const color = apiNpc.cor_assinatura || '#5a8a4a';
+  return {
+    id: String(apiNpc.id),
+    _id: apiNpc.id,
+    name: apiNpc.titulo,
+    flavor: apiNpc.frase_flavor,
+    color,
+    accent: darkenHex(color, 0.6),
+    portrait: darkenHex(color, 0.2),
+    theme: '★'.repeat(Math.max(1, Math.min(5, apiNpc.dificuldade || 1))),
+    initial: (apiNpc.titulo || '?')[0].toUpperCase(),
+    imagem_url: apiNpc.imagem_url || '',
+    state,
+    date,
+  };
+}
 
 export default function Gallery({ onPlay }) {
-  const wonCount = npcs.filter(n => n.state === 'won').length;
+  const [apiNpcs, setApiNpcs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { getState, getDate } = useProgress();
+
+  useEffect(() => {
+    fetchDesafios()
+      .then(setApiNpcs)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sortedIds = apiNpcs.map(n => String(n.id));
+  const npcs = apiNpcs.map(n => normalizeNpc(n, getState(n.id, sortedIds), getDate(n.id)));
+
+  const wonCount       = npcs.filter(n => n.state === 'won').length;
   const availableCount = npcs.filter(n => n.state === 'available').length;
-  const lockedCount = npcs.filter(n => n.state === 'locked').length;
-  const pct = Math.round((wonCount / npcs.length) * 100);
+  const lockedCount    = npcs.filter(n => n.state === 'locked').length;
+  const pct = npcs.length ? Math.round((wonCount / npcs.length) * 100) : 0;
 
   return (
     <main style={{ padding: '28px 22px 60px', maxWidth: 1280, margin: '0 auto' }}>
@@ -32,18 +68,18 @@ export default function Gallery({ onPlay }) {
             <span style={{ color: '#8a7a52' }}>/ {npcs.length}</span>
           </div>
         </div>
-        {/* Barra */}
         <div style={{ height: 12, background: '#0a1219', borderRadius: 6, overflow: 'hidden', position: 'relative', border: '1px solid rgba(212,168,87,.15)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,.6)' }}>
           <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #6b4a16 0%, #c89b3c 50%, #f5d27a 100%)', borderRadius: 5, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '30%', background: 'linear-gradient(90deg, transparent, rgba(255,240,200,.5), transparent)', animation: 'shimmerLine 2.6s linear infinite' }} />
           </div>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-            {npcs.map((_, i) => (
-              <div key={i} style={{ flex: 1, borderRight: i < npcs.length - 1 ? '1px solid rgba(11,22,18,.6)' : 'none' }} />
-            ))}
-          </div>
+          {npcs.length > 1 && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+              {npcs.map((_, i) => (
+                <div key={i} style={{ flex: 1, borderRight: i < npcs.length - 1 ? '1px solid rgba(11,22,18,.6)' : 'none' }} />
+              ))}
+            </div>
+          )}
         </div>
-        {/* Recompensa */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
           <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle, #f5d27a, #8a5d1f)', border: '1px solid #c89b3c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>★</div>
           <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 12, color: '#a89870' }}>
@@ -52,16 +88,30 @@ export default function Gallery({ onPlay }) {
         </div>
       </div>
 
-      {/* Grid de NPCs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
-        {npcs.map(npc => (
-          <div key={npc.id} style={{ position: 'relative' }}>
-            <NPCCard npc={npc} onPlay={onPlay} />
-          </div>
-        ))}
-      </div>
+      {/* Estados de carregamento */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '60px 0', fontFamily: "'Cinzel', serif", fontSize: 14, color: '#7a6a45', letterSpacing: '.2em', animation: 'pulseGold 1.8s ease-in-out infinite' }}>
+          CONVOCANDO OS GUARDIÕES…
+        </div>
+      )}
 
-      {/* Rodapé */}
+      {error && (
+        <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 13, color: '#c84d2a' }}>
+          Falha ao carregar desafios: {error}
+        </div>
+      )}
+
+      {/* Grid de NPCs */}
+      {!loading && !error && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
+          {npcs.map(npc => (
+            <div key={npc.id} style={{ position: 'relative' }}>
+              <NPCCard npc={npc} onPlay={() => onPlay(npc)} />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', marginTop: 42, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#5a5040', letterSpacing: '.15em' }}>
         DESBLOQUEIA EM CADEIA · CADA VITÓRIA REVELA O PRÓXIMO GUARDIÃO
       </div>

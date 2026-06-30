@@ -20,7 +20,12 @@ const npcHand = [
   { card: reveal2, revealed: true },
 ];
 
-export default function Battle() {
+export default function Battle({ npc }) {
+  const npcName    = npc?.name    || 'Desconhecido';
+  const npcInitial = npc?.initial || '?';
+  const npcColor   = npc?.color   || '#8a5a9a';
+  const npcImg     = npc?.imagem_url || '';
+  const npcFlavor  = npc?.flavor  || '';
   const [zoomedCard, setZoomedCard] = useState(null);
   const [chat, setChat] = useState(initialChat);
   const [inputVal, setInputVal] = useState('');
@@ -54,13 +59,16 @@ export default function Battle() {
 
           {/* Banner do NPC */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'linear-gradient(180deg, rgba(38,20,40,.6), rgba(20,12,28,.4))', border: '1px solid rgba(150,90,160,.35)', borderRadius: 10 }}>
-            <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: '50%', overflow: 'hidden', border: '2px solid #c89b3c', boxShadow: '0 0 14px rgba(150,90,160,.5)', background: 'repeating-linear-gradient(45deg, #3a1e3f 0 6px, #2a1530 6px 12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 22, color: '#d4a857', textShadow: '0 0 8px rgba(255,255,255,.4)' }}>B</div>
+            <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${npcColor}`, boxShadow: `0 0 14px ${npcColor}88`, background: `radial-gradient(circle, ${npcColor}44, #0b1612)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {npcImg
+                ? <img src={npcImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} />
+                : <div style={{ fontFamily: "'Cinzel Decorative', serif", fontSize: 22, color: '#d4a857', textShadow: '0 0 8px rgba(255,255,255,.4)' }}>{npcInitial}</div>
+              }
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 18, color: '#e8d5a8', letterSpacing: '.08em' }}>BOITATÁ</div>
-                <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 12, color: '#a89870' }}>— a serpente de fogo</div>
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 18, color: '#e8d5a8', letterSpacing: '.08em' }}>{npcName.toUpperCase()}</div>
+                {npcFlavor && <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 12, color: '#a89870' }}>— {npcFlavor}</div>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.18em', color: '#7a6a45' }}>ESTADO</span>

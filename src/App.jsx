@@ -7,9 +7,15 @@ import './App.css'
 
 export default function App() {
   const [screen, setScreen] = useState('gallery')
+  const [selectedNpc, setSelectedNpc] = useState(null)
 
-  const breadcrumb = screen === 'battle'
-    ? 'Desafio da Semana › Boitatá · turno 07'
+  function handlePlay(npc) {
+    setSelectedNpc(npc)
+    setScreen('battle')
+  }
+
+  const breadcrumb = screen === 'battle' && selectedNpc
+    ? `Desafio da Semana › ${selectedNpc.name} · turno 01`
     : 'Modo Aventura › Desafios › Semanal'
 
   return (
@@ -22,8 +28,8 @@ export default function App() {
           breadcrumb={breadcrumb}
         />
         {screen === 'gallery'
-          ? <Gallery onPlay={() => setScreen('battle')} />
-          : <Battle />
+          ? <Gallery onPlay={handlePlay} />
+          : <Battle npc={selectedNpc} />
         }
       </div>
     </>

@@ -11,7 +11,7 @@ export default function NPCCard({ npc, onPlay }) {
   const tagColor = isLocked ? '#5a5040' : npc.color;
   const nameColor = isLocked ? '#7a7068' : '#e8d5a8';
   const flavorColor = isLocked ? '#5a5040' : '#a89870';
-  const idTag = npc.id.toUpperCase().slice(0, 4);
+  const idTag = String(npc.id).slice(-4);
 
   return (
     <div
@@ -58,9 +58,12 @@ export default function NPCCard({ npc, onPlay }) {
         background: `radial-gradient(ellipse at 50% 35%, ${portraitLight} 0%, ${npc.portrait} 55%, #0b1612 100%)`,
       }}>
         <div style={{ position: 'absolute', inset: 0, opacity: .45, background: 'repeating-linear-gradient(112deg, rgba(0,0,0,.18) 0 2px, transparent 2px 8px), repeating-linear-gradient(68deg, rgba(255,240,200,.05) 0 1px, transparent 1px 6px)' }} />
+        {npc.imagem_url && (
+          <img src={npc.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', opacity: isLocked ? 0.5 : 0.85, mixBlendMode: 'luminosity' }} />
+        )}
         <div style={{ position: 'absolute', left: '50%', bottom: 0, transform: 'translateX(-50%)', width: '62%', height: '75%', background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,.35) 70%, rgba(0,0,0,.65) 100%)', borderRadius: '50% 50% 12% 12%' }} />
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 88, color: monoColor, opacity: .85, textShadow: `0 4px 20px rgba(0,0,0,.7), 0 0 30px ${monoColor}88`, letterSpacing: '-.04em' }}>{npc.initial}</div>
+          <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 88, color: monoColor, opacity: npc.imagem_url ? 0 : .85, textShadow: `0 4px 20px rgba(0,0,0,.7), 0 0 30px ${monoColor}88`, letterSpacing: '-.04em' }}>{npc.initial}</div>
         </div>
         {/* Tag de tema */}
         <div style={{ position: 'absolute', top: 12, left: 12, padding: '4px 8px', background: 'rgba(11,22,18,.7)', border: `1px solid ${tagColor}55`, borderRadius: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, letterSpacing: '.18em', color: tagColor, textTransform: 'uppercase' }}>▶ {npc.theme}</div>
