@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Cinzel+Decorative:wght@700;900&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  min-height: 100vh;
+  background: #0b1612;
+  font-family: 'Lora', Georgia, serif;
+  color: #e8d5a8;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,168,87,.55), 0 0 30px rgba(212,168,87,.25), inset 0 0 24px rgba(212,168,87,.18); }
+  50% { box-shadow: 0 0 0 6px rgba(212,168,87,.05), 0 0 50px rgba(212,168,87,.45), inset 0 0 32px rgba(212,168,87,.32); }
+}
+
+@keyframes shimmerLine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,168,87,.55); }
+  50% { box-shadow: 0 0 0 6px rgba(212,168,87,0); }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #3d2817; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+button { cursor: pointer; font-family: inherit; border: none; }
+input:focus { outline: none; }
+
+.npc-card { transition: transform .25s ease; }
+.npc-card:hover:not(.locked) { transform: translateY(-3px); }
+
+@media (max-width: 980px) {
+  .battle-grid { grid-template-columns: 1fr !important; }
+  .battle-sidebar { position: static !important; max-width: none !important; height: auto !important; }
+}
