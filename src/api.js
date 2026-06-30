@@ -1,13 +1,10 @@
-const BASE = 'https://lendasebatalhas.com.br/wp-json/lendas/v1';
+// Barrel de re-export — mantém compatibilidade com imports existentes
+// e expõe toda a camada de API para quem importar de '../api'.
 
-export async function fetchDesafios() {
-  const res = await fetch(`${BASE}/desafios`);
-  if (!res.ok) throw new Error(`Erro ${res.status}`);
-  return res.json();
-}
+export * from './api/cartas.js';
+export * from './api/desafios.js';
+export * from './api/progresso.js';
+export { adaptarCarta } from './api/adapter.js';
 
-export async function fetchDesafio(id) {
-  const res = await fetch(`${BASE}/desafios/${id}`);
-  if (!res.ok) throw new Error(`Erro ${res.status}`);
-  return res.json();
-}
+// Aliases de backward-compat usados pelos componentes anteriores
+export { getDesafios as fetchDesafios, getDesafioById as fetchDesafio } from './api/desafios.js';
