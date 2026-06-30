@@ -37,9 +37,12 @@ export default function CharSlot({ card, side, selected, attacking, onZoom }) {
       {filled ? (
         <>
           <div style={{ flex: 1, borderRadius: 4, position: 'relative', overflow: 'hidden', background: `repeating-linear-gradient(125deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px), radial-gradient(ellipse at 50% 35%, ${portraitLight}, ${portraitDark} 70%, #0b1612)` }}>
-            <div style={{ position: 'absolute', top: 3, left: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: accentColor, opacity: .85 }}>★{card.atk ?? 0}</div>
-            <div style={{ position: 'absolute', top: 3, right: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#a8c8e8', opacity: .85 }}>◆{card.def ?? 0}</div>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 26, color: accentColor, opacity: .55, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{initial}</div>
+            {card.imagem_url && (
+              <img src={card.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', opacity: .9 }} />
+            )}
+            <div style={{ position: 'absolute', top: 3, left: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: accentColor, opacity: .9, textShadow: '0 1px 2px rgba(0,0,0,.8)' }}>★{card.atk ?? 0}</div>
+            <div style={{ position: 'absolute', top: 3, right: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#a8c8e8', opacity: .9, textShadow: '0 1px 2px rgba(0,0,0,.8)' }}>◆{card.def ?? 0}</div>
+            {!card.imagem_url && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 26, color: accentColor, opacity: .55, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{initial}</div>}
             {attacking && <div style={{ position: 'absolute', inset: 0, boxShadow: 'inset 0 0 0 2px #c84d2a, inset 0 0 14px rgba(200,77,42,.5)', borderRadius: 4 }} />}
           </div>
           <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, lineHeight: 1.1, color: '#e8d5a8', textAlign: 'center', marginTop: 4, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>

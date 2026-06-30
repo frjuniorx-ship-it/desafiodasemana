@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { battleCards, initialChat, battleLog } from '../data';
+import { initialChat, battleLog } from '../data';
+import { useBattleState } from '../hooks/useBattleState.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
 import SmallSlot from './battle/SmallSlot';
@@ -8,24 +9,20 @@ import NPCHandCard from './battle/NPCHandCard';
 import CardZoom from './battle/CardZoom';
 import ChatBubble from './battle/ChatBubble';
 
-const { pChar0, pChar1, pChar2, pPlant0, pPlant1,
-        npcChar0, npcChar1, npcChar3, npcPlant0, npcPlant2,
-        reveal1, reveal2 } = battleCards;
-
-const npcHand = [
-  { card: { name:'???' }, revealed: false },
-  { card: reveal1, revealed: true },
-  { card: { name:'???' }, revealed: false },
-  { card: { name:'???' }, revealed: false },
-  { card: reveal2, revealed: true },
-];
-
 export default function Battle({ npc }) {
   const npcName    = npc?.name    || 'Desconhecido';
   const npcInitial = npc?.initial || '?';
   const npcColor   = npc?.color   || '#8a5a9a';
   const npcImg     = npc?.imagem_url || '';
   const npcFlavor  = npc?.flavor  || '';
+
+  const {
+    loading: deckLoading,
+    deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
+    campoJogador, pcJogador,
+    jogadorJogarCarta,
+  } = useBattleState(npc);
+
   const [zoomedCard, setZoomedCard] = useState(null);
   const [chat, setChat] = useState(initialChat);
   const [inputVal, setInputVal] = useState('');
@@ -45,8 +42,22 @@ export default function Battle({ npc }) {
     if (!text) return;
     setInputVal('');
     setChat(prev => [...prev, { kind: 'player', text }]);
+
+    const matchJogar = /jogu[eo]i\s+(.+)/i.exec(text);
+    if (matchJogar) {
+      const nomeCarta = matchJogar[1].trim();
+      jogadorJogarCarta(nomeCarta).then(carta => {
+        if (carta) {
+          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
+        } else {
+          setChat(prev => [...prev, { kind: 'system', text: `Carta "${nomeCarta}" não encontrada. Confirme o nome exato.` }]);
+        }
+      });
+      return;
+    }
+
     setTimeout(() => {
-      setChat(prev => [...prev, { kind: 'ai', text: 'Boa jogada. Observe a posição do Lobisomem antes de confirmar — ele tem Investida nos turnos pares.' }]);
+      setChat(prev => [...prev, { kind: 'ai', text: 'Boa jogada. Observe a posição do oponente antes de confirmar.' }]);
     }, 1200);
   }
 
@@ -89,14 +100,19 @@ export default function Battle({ npc }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'linear-gradient(180deg, rgba(38,20,28,.45), rgba(20,12,16,.35))', border: '1px solid rgba(200,77,42,.28)', borderRadius: 10 }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.22em', color: '#a85040', writingMode: 'vertical-rl', transform: 'rotate(180deg)', flexShrink: 0 }}>MÃO DO NPC · 5</div>
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8, maxWidth: 480 }}>
-              {npcHand.map((h, i) => (
-                <NPCHandCard key={i} card={h.card} revealed={h.revealed} onZoom={zoomCard} />
-              ))}
+              {deckLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <NPCHandCard key={i} card={{ name: '???' }} revealed={false} onZoom={zoomCard} />
+                  ))
+                : maoNpc.map((carta, i) => (
+                    <NPCHandCard key={i} card={carta} revealed={false} onZoom={zoomCard} />
+                  ))
+              }
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#5a5040', letterSpacing: '.18em' }}>REVELADAS</div>
-              <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>2 / 5</div>
-              <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 9, color: '#7a6a45' }}>por "Índio Curioso"</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#5a5040', letterSpacing: '.18em' }}>NA MÃO</div>
+              <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>{maoNpc.length}</div>
+              <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 9, color: '#7a6a45' }}>cartas</div>
             </div>
           </div>
 
@@ -106,29 +122,27 @@ export default function Battle({ npc }) {
             {/* Campo do NPC */}
             <div style={{ background: 'radial-gradient(ellipse at center, rgba(80,20,30,.35), transparent 75%), linear-gradient(180deg, rgba(38,20,28,.5), rgba(20,12,16,.3))', border: '1px solid rgba(200,77,42,.3)', borderRadius: 12, padding: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#a85040' }}>▲ CAMPO DO BOITATÁ</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#a85040' }}>▲ CAMPO DO {npcName.toUpperCase()}</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallSlot label="DECK" count={22} />
-                  <SmallSlot label="ESQUEC." faceUp cardName="Iara" />
+                  <SmallSlot label="DECK" count={deckNpc.length} />
+                  <SmallSlot label="ESQUEC." faceUp={esquecimentoNpc.length > 0} cardName={esquecimentoNpc[esquecimentoNpc.length - 1]?.name} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                  <UtilSlot kind="folc" count={3} side="npc" />
-                  <UtilSlot kind="acao" filled side="npc" />
+                  <UtilSlot kind="folc" count={campoNpc.folcloricas.length} side="npc" />
+                  <UtilSlot kind="acao" filled={!!campoNpc.acao} side="npc" />
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 8%' }}>
-                    <PlantSlot card={npcPlant0} side="npc" onZoom={zoomCard} />
-                    <PlantSlot side="npc" onZoom={zoomCard} />
-                    <PlantSlot card={npcPlant2} side="npc" onZoom={zoomCard} />
+                    {campoNpc.plantas.map((carta, i) => (
+                      <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                    ))}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                    <CharSlot card={npcChar0} side="npc" onZoom={zoomCard} />
-                    <CharSlot card={npcChar1} side="npc" onZoom={zoomCard} />
-                    <CharSlot side="npc" onZoom={zoomCard} />
-                    <CharSlot card={npcChar3} side="npc" attacking onZoom={zoomCard} />
-                    <CharSlot side="npc" onZoom={zoomCard} />
+                    {campoNpc.personagens.map((carta, i) => (
+                      <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -136,41 +150,39 @@ export default function Battle({ npc }) {
 
             {/* Faixa central de PC */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 10px', background: 'linear-gradient(90deg, rgba(80,20,30,.25), rgba(13,27,42,.4) 50%, rgba(26,46,34,.25))', border: '1px solid rgba(212,168,87,.25)', borderRadius: 10 }}>
-              <PCMedallion value={14} label="BOITATÁ" delta="-3 neste turno" deltaColor="#a85040" />
+              <PCMedallion value={pcNpc} label={npcName.toUpperCase()} delta="" deltaColor="#a85040" />
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '0 4px', flexShrink: 0 }}>
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
                 <div style={{ width: 30, height: 1, background: '#c89b3c' }} />
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#5a5040', letterSpacing: '.15em' }}>META 20</div>
               </div>
-              <PCMedallion value={17} label="AURÉLIO" delta="+2 sangue novo" deltaColor="#5a8a4a" right />
+              <PCMedallion value={pcJogador} label="VOCÊ" delta="" deltaColor="#5a8a4a" right />
             </div>
 
             {/* Campo do jogador */}
             <div style={{ background: 'radial-gradient(ellipse at center, rgba(26,46,34,.4), transparent 75%), linear-gradient(0deg, rgba(26,46,34,.55), rgba(15,31,23,.35))', border: '1px solid rgba(90,138,74,.4)', borderRadius: 12, padding: 12 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                  <UtilSlot kind="folc" count={2} side="player" />
-                  <UtilSlot kind="acao" filled side="player" />
+                  <UtilSlot kind="folc" count={campoJogador.folcloricas.length} side="player" />
+                  <UtilSlot kind="acao" filled={!!campoJogador.acao} side="player" />
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                    <CharSlot card={pChar0} side="player" onZoom={zoomCard} />
-                    <CharSlot card={pChar1} side="player" selected onZoom={zoomCard} />
-                    <CharSlot card={pChar2} side="player" onZoom={zoomCard} />
-                    <CharSlot side="player" onZoom={zoomCard} />
-                    <CharSlot side="player" onZoom={zoomCard} />
+                    {campoJogador.personagens.map((carta, i) => (
+                      <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                    ))}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 8%' }}>
-                    <PlantSlot card={pPlant0} side="player" onZoom={zoomCard} />
-                    <PlantSlot card={pPlant1} side="player" onZoom={zoomCard} />
-                    <PlantSlot side="player" onZoom={zoomCard} />
+                    {campoJogador.plantas.map((carta, i) => (
+                      <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                    ))}
                   </div>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, padding: '0 4px' }}>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallSlot label="DECK" count={18} />
-                  <SmallSlot label="ESQUEC." faceUp cardName="Saci" />
+                  <SmallSlot label="DECK" count={20} />
+                  <SmallSlot label="ESQUEC." />
                 </div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#5a8a4a' }}>▼ SEU CAMPO</div>
               </div>
