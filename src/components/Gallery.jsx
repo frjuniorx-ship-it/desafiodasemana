@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import NPCCard from './NPCCard';
-import { fetchDesafios } from '../api';
+// TODO: trocar por getDesafios() quando endpoint /desafios estiver pronto no WordPress
+import { getDesafiosMock as fetchDesafios } from '../api/mocks/desafios.js';
+import { getCartas } from '../api/cartas.js';
 import { useProgress } from '../useProgress';
 import { darkenHex } from '../utils';
 
@@ -33,6 +35,11 @@ export default function Gallery({ onPlay }) {
       .then(setApiNpcs)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
+
+    // Verifica CORS do endpoint /cartas — remover quando confirmar funcionando
+    getCartas()
+      .then(cartas => console.log('[CORS OK] /cartas retornou', cartas.length, 'cartas', cartas[0] ?? null))
+      .catch(err => console.error('[CORS ERRO] /cartas falhou:', err.message));
   }, []);
 
   const sortedIds = apiNpcs.map(n => String(n.id));
