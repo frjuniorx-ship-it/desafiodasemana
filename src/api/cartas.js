@@ -1,10 +1,14 @@
 import { get } from './client.js';
 import { adaptarCarta } from './adapter.js';
 
+let _cache = null;
+
 export async function getCartas(params = {}) {
+  if (_cache) return _cache;
   const qs = new URLSearchParams(params).toString();
   const data = await get(`/cartas${qs ? '?' + qs : ''}`);
-  return data.map(adaptarCarta);
+  _cache = data.map(adaptarCarta);
+  return _cache;
 }
 
 // Busca por nome exato (case-insensitive).

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { initialChat, battleLog } from '../data';
+import { initialChat } from '../data';
 import { useBattleState } from '../hooks/useBattleState.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -20,6 +20,7 @@ export default function Battle({ npc }) {
     loading: deckLoading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
+    turno, vezDoNpc, log, passarVez,
     jogadorJogarCarta,
   } = useBattleState(npc);
 
@@ -87,7 +88,7 @@ export default function Battle({ npc }) {
                   <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '62%', background: 'linear-gradient(90deg, #3a7a4a, #c89b3c 60%, #c84d2a)', borderRadius: 2 }} />
                   <div style={{ position: 'absolute', left: '62%', top: -3, width: 2, height: 11, background: '#f5d27a', boxShadow: '0 0 6px #f5d27a' }} />
                 </div>
-                <span style={{ fontFamily: "'Cinzel', serif", fontStyle: 'italic', fontSize: 11, color: '#d4a857' }}>decidindo…</span>
+                <span style={{ fontFamily: "'Cinzel', serif", fontStyle: 'italic', fontSize: 11, color: vezDoNpc ? '#c84d2a' : '#d4a857' }}>{vezDoNpc ? 'decidindo…' : 'aguardando'}</span>
               </div>
             </div>
             {/* Mão do NPC integrada na barra */}
@@ -104,8 +105,8 @@ export default function Battle({ npc }) {
               }
             </div>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#7a6a45', textAlign: 'right', letterSpacing: '.12em', flexShrink: 0 }}>
-              TURNO <span style={{ color: '#d4a857', fontSize: 14, fontWeight: 600 }}>07</span><br />
-              <span style={{ color: '#5a5040' }}>vez do oponente</span>
+              TURNO <span style={{ color: '#d4a857', fontSize: 14, fontWeight: 600 }}>{turno || '—'}</span><br />
+              <span style={{ color: vezDoNpc ? '#c84d2a' : '#5a5040' }}>{vezDoNpc ? 'vez do oponente' : 'sua vez'}</span>
             </div>
           </div>
 
@@ -187,7 +188,7 @@ export default function Battle({ npc }) {
             {/* Linha divisória */}
             <div style={{ height: 2, flexShrink: 0, background: 'linear-gradient(90deg, transparent, rgba(212,168,87,.5) 20%, rgba(212,168,87,.85) 50%, rgba(212,168,87,.5) 80%, transparent)', position: 'relative' }}>
               <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 5 }}>
-                <PassTurnButton />
+                <PassTurnButton onClick={passarVez} disabled={vezDoNpc} />
               </div>
             </div>
 
@@ -223,12 +224,15 @@ export default function Battle({ npc }) {
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.22em', color: '#7a6a45' }}>RELATO DA BATALHA</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}>
-                {battleLog.map((ev, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontFamily: "'Lora', serif", fontSize: 12, lineHeight: 1.35 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#5a5040', flexShrink: 0 }}>{ev.t}</span>
-                    <span style={{ color: ev.color }}>{ev.text}</span>
-                  </div>
-                ))}
+                {log.length === 0
+                  ? <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 11, color: '#5a5040', opacity: .6 }}>Clique em "Passar a Vez" para iniciar a batalha.</div>
+                  : log.map((ev, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontFamily: "'Lora', serif", fontSize: 12, lineHeight: 1.35 }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#5a5040', flexShrink: 0 }}>{ev.t}</span>
+                        <span style={{ color: ev.color }}>{ev.text}</span>
+                      </div>
+                    ))
+                }
               </div>
             </div>
 
@@ -295,10 +299,12 @@ function PCMedallion({ value, label, delta, deltaColor, right }) {
   );
 }
 
-function PassTurnButton() {
+function PassTurnButton({ onClick, disabled }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
+      onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -307,13 +313,15 @@ function PassTurnButton() {
         border: '1.5px solid #f5d27a', color: '#0b1612',
         fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, letterSpacing: '.16em',
         padding: '0 10px', borderRadius: 18,
-        boxShadow: hovered
+        boxShadow: hovered && !disabled
           ? '0 0 24px rgba(200,155,60,.7), inset 0 -2px 6px rgba(0,0,0,.3), inset 0 2px 3px rgba(255,240,200,.6), 0 4px 0 #0b1612'
           : '0 0 16px rgba(200,155,60,.55), inset 0 -2px 6px rgba(0,0,0,.3), inset 0 2px 3px rgba(255,240,200,.6), 0 3px 0 #0b1612',
         textShadow: '0 1px 0 rgba(255,240,200,.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, whiteSpace: 'nowrap',
-        transform: hovered ? 'translateY(-1px)' : '',
+        transform: hovered && !disabled ? 'translateY(-1px)' : '',
         transition: 'transform .15s, box-shadow .15s',
+        opacity: disabled ? .45 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
       }}
     >
       ⏭ PASSAR A VEZ
