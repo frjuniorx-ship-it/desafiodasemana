@@ -3,7 +3,8 @@ import { getDesafioById } from '../api/desafios.js';
 import { getCartaByNome } from '../api/cartas.js';
 import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
-  isFolclorica, isPlanta, podeAtacar,
+  isFolclorica, isPlanta, podeAtacar, podeEquipar,
+  podeSer_Jogada_Folclorica,
   SLOTS, LIMITE_TURNO, PC_INICIAL,
 } from '../engine/rules.js';
 
@@ -58,12 +59,6 @@ function expandirDeck(deckEntradas) {
 
 function toArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
 
-// Equipamento pode ser usado num personagem se classes compatíveis (ou sem restrição)
-function podeEquipar(equip, personagem) {
-  const ce = equip.classes || [];
-  const cp = personagem.classes || [];
-  return ce.length === 0 || ce.some(c => cp.includes(c));
-}
 
 function categoriaParaZona(categoria) {
   if (!categoria) return 'personagens';
@@ -252,26 +247,24 @@ export function useBattleState(npc) {
     // 6. Jogar folclórica (nd cartas descartadas da mão, excluindo a própria)
     await delay(800);
     if (!flags.jogouFolclorica) {
-      const mi = workMao.findIndex(c => isFolclorica(c));
+      const mi = workMao.findIndex(c => podeSer_Jogada_Folclorica(c, workMao));
       if (mi !== -1) {
         const folc = workMao[mi];
-        const nd = folc.nd ?? 0;
-        if (workMao.length - 1 >= nd) {
-          const descIdxs = new Set([mi]);
-          let cnt = 0;
-          for (let i = 0; i < workMao.length && cnt < nd; i++) {
-            if (i !== mi) { descIdxs.add(i); cnt++; }
-          }
-          const descartar = workMao.filter((_, i) => descIdxs.has(i) && i !== mi);
-          workEsq = [...workEsq, ...descartar];
-          workMao = workMao.filter((_, i) => !descIdxs.has(i));
-          workCampo.folcloricas = [...workCampo.folcloricas, folc];
-          flags.jogouFolclorica = true;
-          setMaoNpc([...workMao]);
-          setEsquecimentoNpc([...workEsq]);
-          setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
-          addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''}`, '#e8a890');
+        const nd = folc.nd ?? folc.numero_descarte ?? 0;
+        const descIdxs = new Set([mi]);
+        let cnt = 0;
+        for (let i = 0; i < workMao.length && cnt < nd; i++) {
+          if (i !== mi) { descIdxs.add(i); cnt++; }
         }
+        const descartar = workMao.filter((_, i) => descIdxs.has(i) && i !== mi);
+        workEsq = [...workEsq, ...descartar];
+        workMao = workMao.filter((_, i) => !descIdxs.has(i));
+        workCampo.folcloricas = [...workCampo.folcloricas, folc];
+        flags.jogouFolclorica = true;
+        setMaoNpc([...workMao]);
+        setEsquecimentoNpc([...workEsq]);
+        setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
+        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''}`, '#e8a890');
       }
     }
 
