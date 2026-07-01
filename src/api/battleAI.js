@@ -4,11 +4,15 @@ import { normStr } from '../hooks/useBattleState.js';
 export function processarAcaoBatalha(texto, estadoCampo) {
   const t = normStr(texto); // normaliza acentos, minúsculas, hífens→espaço
 
-  // Remove sufixos que não fazem parte do nome da carta
+  // Remove sufixos e artigos que não fazem parte do nome da carta
   const limpar = (s) => s
-    .replace(/\b(em campo|no campo|na area|em jogo|agora|ja|para o campo|pro campo)\b/g, '')
-    .replace(/\b(a carta|o personagem|a planta|o equipamento|a folclorica)\b/g, '')
+    .replace(/\b(em campo|no campo|na area|em jogo|agora|ja|para o campo|pro campo|no primeiro slot|no segundo slot|no terceiro slot|em cima|embaixo)\b/g, '')
+    .replace(/\b(a carta|o personagem|a planta|o equipamento|a folclorica|uma planta|um personagem)\b/g, '')
+    .replace(/\bpc\b/g, '')
     .trim();
+
+  // Detecta zona pelo contexto do texto (hint para quem chama)
+  const zonaTexto = /\bfolcl/.test(t) ? 'folcloricas' : /\bplanta\b/.test(t) ? 'plantas' : null;
 
   // PASSAR VEZ
   if (/\b(passo|fim|termino|acabei|proximo turno|pass|nao tenho mais|sem jogada|finalizo)\b/.test(t)) {
@@ -20,8 +24,20 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'confirmar_combate' };
   }
 
-  // ATACAR COM CARTA ESPECÍFICA — "ataco X com Y", "Y ataca X"
-  let mAtacar = t.match(/(?:atac[oa]|ataquei|atacando)\s+(?:o\s+|a\s+)?(.+?)\s+(?:com|usando|pelo)\s+(?:o\s+|a\s+)?(.+)/);
+  // ATAQUE DIRETO COM CARTA — "ataco direto com Tibiriçá" (antes de "ataco X com Y")
+  const mAtaqueDiretoComCarta = t.match(/(?:atac[oa]|ataquei|atacando)\s+(?:direto|diretamente)\s+(?:com|usando|pelo)\s+(?:o\s+|a\s+)?(.+)/);
+  if (mAtaqueDiretoComCarta) {
+    return { acao: 'ataque_direto', carta: limpar(mAtaqueDiretoComCarta[1]) };
+  }
+
+  // ATAQUE DIRETO GENÉRICO — vem antes de "ataco X com Y" para que "direto" não seja tratado como nome de alvo
+  if (/(?:atac[oa]|ataquei)\s+(?:direto|(?:o\s+)?pc|os pontos|diretamente)/.test(t) ||
+      /ataque\s+direto/.test(t)) {
+    return { acao: 'ataque_direto' };
+  }
+
+  // ATACAR COM CARTA ESPECÍFICA — "ataco X com Y"
+  const mAtacar = t.match(/(?:atac[oa]|ataquei|atacando)\s+(?:o\s+|a\s+)?(.+?)\s+(?:com|usando|pelo)\s+(?:o\s+|a\s+)?(.+)/);
   if (mAtacar) {
     return { acao: 'atacar', alvo: limpar(mAtacar[1]), carta: limpar(mAtacar[2]) };
   }
@@ -31,22 +47,19 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'atacar', alvo: limpar(mAtacarInverso[2]), carta: limpar(mAtacarInverso[1]) };
   }
 
-  // ATAQUE DIRETO
-  if (/(?:atac[oa]|ataquei)\s+(?:direto|o pc|os pontos|diretamente)/.test(t) ||
-      /ataque\s+direto/.test(t)) {
-    return { acao: 'ataque_direto' };
-  }
-
   // ATACAR SEM ESPECIFICAR CARTA (usa primeiro disponível)
   const mAtacarSimples = t.match(/^(?:atac[oa]|ataquei|ataque)\s+(?:o\s+|a\s+)?(.+)/);
   if (mAtacarSimples) {
     return { acao: 'atacar', alvo: limpar(mAtacarSimples[1]), carta: null };
   }
 
-  // EQUIPAR
+  // EQUIPAR — se alvo é zona genérica ("campo", "area"…) não é equipar, cai para jogar_carta
   const mEquipar = t.match(/(?:equip(?:o|ei|ar)|coloc(?:o|ei))\s+(?:o\s+|a\s+)?(.+?)\s+(?:em|no|na|sobre|em cima de)\s+(?:o\s+|a\s+)?(.+)/);
   if (mEquipar) {
-    return { acao: 'equipar', carta: limpar(mEquipar[1]), alvo: limpar(mEquipar[2]) };
+    const alvo = limpar(mEquipar[2]);
+    if (alvo && !['campo', 'area', 'jogo', 'slot'].includes(alvo)) {
+      return { acao: 'equipar', carta: limpar(mEquipar[1]), alvo };
+    }
   }
 
   // JOGAR COM EQUIPAMENTO — "joguei Tibiriçá equipado com Arco e Flecha"
@@ -54,7 +67,7 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   if (mComEquip) {
     return {
       acao: 'jogar_com_equipamento',
-      carta: limpar(mComEquip[1].replace(/^(?:jog(?:o|uei)|baix(?:o|ei)|desc(?:o|i))\s+/, '')),
+      carta: limpar(mComEquip[1].replace(/^(?:jog(?:o|uei)|baix(?:o|ei)|desc(?:o|i)|coloc[ao]|bot[ao])\s+/, '')),
       equipamento: limpar(mComEquip[2]),
     };
   }
@@ -71,10 +84,10 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'descartar', carta: limpar(mDescartar[1]) };
   }
 
-  // JOGAR CARTA (padrão genérico — por último)
-  const mJogar = t.match(/(?:jog(?:o|uei|ar)|baix(?:o|ei)|coloc(?:o|ei)|desc(?:o|i)|entr(?:a|ou)|us(?:o|ei)|ativ(?:o|ei))\s+(?:o\s+|a\s+)?(.+)/);
+  // JOGAR CARTA (padrão genérico com verbos expandidos — por último)
+  const mJogar = t.match(/(?:jog(?:o|uei|ar)|baix(?:o|ei)|coloc[ao]|ponho|poe|desc(?:o|i)|entr(?:a|ou)|us(?:o|ei)|ativ(?:o|ei)|adiciono|boto|bota)\s+(?:o\s+|a\s+|um(?:a)?\s+)?(.+)/);
   if (mJogar) {
-    return { acao: 'jogar_carta', carta: limpar(mJogar[1]) };
+    return { acao: 'jogar_carta', carta: limpar(mJogar[1]), ...(zonaTexto ? { zona: zonaTexto } : {}) };
   }
 
   // REMOVER/SUBSTITUIR

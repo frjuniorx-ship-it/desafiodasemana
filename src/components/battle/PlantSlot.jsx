@@ -36,6 +36,19 @@ export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
               {!card.imagem_url && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 26, color: '#5a8a4a', opacity: .55 }}>{(card.name[0] || '?').toUpperCase()}</div>}
             </div>
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,.65)', fontFamily: "'Cinzel', serif", fontSize: 9, lineHeight: 1.2, color: '#e8d5a8', textAlign: 'center', padding: '2px 4px', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
+            {/* Status badges */}
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
+              {card.paralisada && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(60,80,200,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#c8d0ff', fontWeight: 700, letterSpacing: '.06em' }}>PARALISADO</span>
+                </div>
+              )}
+              {card.arruinada && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, background: 'rgba(200,100,0,.88)', padding: '1px 0' }}>
+                  <span style={{ display: 'block', textAlign: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#fff8e8', letterSpacing: '.06em', fontWeight: 700 }}>ARRUINADO</span>
+                </div>
+              )}
+            </div>
           </>
         )
       ) : (

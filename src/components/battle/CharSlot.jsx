@@ -68,6 +68,39 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
               }
             </div>
           )}
+          {/* Status badges — pointer-events: none para não bloquear hover/zoom */}
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
+            {card.paralisada && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(60,80,200,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#c8d0ff', fontWeight: 700, letterSpacing: '.06em' }}>PARALISADO</span>
+              </div>
+            )}
+            {card.imobilizada && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(90,20,160,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#d0b0ff', fontWeight: 700, letterSpacing: '.06em' }}>IMOB.</span>
+              </div>
+            )}
+            {card.arruinada && (
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, background: 'rgba(200,100,0,.88)', padding: '1px 0' }}>
+                <span style={{ display: 'block', textAlign: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#fff8e8', letterSpacing: '.06em', fontWeight: 700 }}>ARRUINADO</span>
+              </div>
+            )}
+            {card.defAtual !== undefined && card.defAtual < (card.def ?? 0) && (
+              <div style={{ position: 'absolute', bottom: 16, left: 2, background: 'rgba(200,40,40,.9)', borderRadius: 2, padding: '1px 3px' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#fff', fontWeight: 700 }}>DEF {card.defAtual}</span>
+              </div>
+            )}
+            {card.atqAtual !== undefined && card.atqAtual !== (card.atk ?? 0) && (
+              <div style={{ position: 'absolute', bottom: 16, right: card.equipamentos?.length ? 44 : 2, background: card.atqAtual > (card.atk ?? 0) ? 'rgba(40,160,60,.9)' : 'rgba(200,40,40,.9)', borderRadius: 2, padding: '1px 3px' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#fff', fontWeight: 700 }}>ATQ {card.atqAtual}</span>
+              </div>
+            )}
+            {card.furiaBonus > 0 && (
+              <div style={{ position: 'absolute', top: 14, right: 2, background: 'rgba(160,110,0,.9)', border: '1px solid #f5d27a', borderRadius: 2, padding: '1px 3px' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#fff8a0', fontWeight: 700 }}>FÚRIA +{card.furiaBonus}</span>
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: .35 }}>

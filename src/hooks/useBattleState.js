@@ -206,7 +206,8 @@ export function useBattleState(npc) {
     // 2. Jogar personagem — heurística: maior ATK se oponente tem campo, maior DEF se vazio
     await delay(800);
     if (!flags.jogouPersonagem) {
-      const candidatos = workMao.filter(c => isPersonagem(c));
+      // rules.js isPersonagem verifica 'Histórica'/'Fera'; API pode retornar 'Personagem' — inclui ambos
+      const candidatos = workMao.filter(c => isPersonagem(c) || c.tipo === 'Personagem');
       const si = workCampo.personagens.indexOf(null);
       if (candidatos.length > 0 && si !== -1) {
         const adversarioTemCampo = campoJogador.personagens.some(Boolean);
