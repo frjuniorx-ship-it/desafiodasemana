@@ -47,6 +47,27 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
             {attacking && <div style={{ position: 'absolute', inset: 0, boxShadow: 'inset 0 0 0 2px #c84d2a, inset 0 0 14px rgba(200,77,42,.5)', borderRadius: 4 }} />}
           </div>
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,.65)', fontFamily: "'Cinzel', serif", fontSize: 9, lineHeight: 1.2, color: '#e8d5a8', textAlign: 'center', padding: '2px 4px', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
+          {card.equipamentos?.length > 0 && (
+            <div
+              onMouseEnter={() => onZoom && onZoom(card.equipamentos[0])}
+              onMouseLeave={() => onZoom && onZoom(card)}
+              style={{
+                position: 'absolute', bottom: 14, right: 2,
+                width: '42%', height: '44%',
+                background: 'linear-gradient(135deg, #1e2e1e, #0f1e10)',
+                border: '1px solid rgba(212,168,87,.6)',
+                borderRadius: 4,
+                boxShadow: '-2px -2px 8px rgba(0,0,0,.6), 0 0 8px rgba(212,168,87,.25)',
+                overflow: 'hidden', transform: 'rotate(3deg)',
+                cursor: 'pointer', zIndex: 2,
+              }}
+            >
+              {card.equipamentos[0].imagem_url
+                ? <img src={card.equipamentos[0].imagem_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontFamily: "'Cinzel Decorative', serif", fontSize: 10, color: '#d4a857' }}>{(card.equipamentos[0].name?.[0] || '?').toUpperCase()}</div>
+              }
+            </div>
+          )}
         </>
       ) : (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: .35 }}>

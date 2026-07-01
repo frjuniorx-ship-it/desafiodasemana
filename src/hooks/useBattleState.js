@@ -4,7 +4,7 @@ import { getCartas } from '../api/cartas.js';
 import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
   isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea,
-  podeSer_Jogada_Folclorica,
+  podeSer_Jogada_Folclorica, resolverCombate, pcPerdidoPorDestruicao,
   SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
 } from '../engine/rules.js';
 
@@ -61,6 +61,7 @@ function normalizeCardForSlot(entrada) {
     mecanica:   toArray(entrada.mecanica ?? entrada.mecanicas ?? []),
     classes:    toArray(entrada.classe   ?? entrada.classes   ?? []),
     entrou_turno_atual: false,
+    equipamentos: [],
   };
 }
 
@@ -110,6 +111,7 @@ export function useBattleState(npc) {
   const [log, setLog]                     = useState([]);
   const [fimDeJogo, setFimDeJogo]         = useState(null); // null | 'vitoria' | 'derrota'
   const [prontoParaJogar, setProntoParaJogar] = useState(false);
+  const [combatePendente, setCombatePendente] = useState(null); // null | { atacanteNome, alvoNome, dano }
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
 
@@ -305,6 +307,7 @@ export function useBattleState(npc) {
       for (const atk of atacantes) {
         await delay(800);
         if (alvos.length > 0) {
+          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvos[0].name, dano: atk.atk ?? 0 });
           addLog(`[COMBATE] ${atk.name} atacou ${alvos[0].name} — confirme ou responda com carta`, '#c84d2a');
         } else {
           const dano = atk.atk ?? 0;
@@ -332,6 +335,12 @@ export function useBattleState(npc) {
       npcExecutarTurno();
     }
   }, [prontoParaJogar, npcExecutarTurno]);
+
+  useEffect(() => {
+    if (!prontoParaJogar || fimDeJogo) return;
+    if (pcJogador <= 0) setFimDeJogo('derrota');
+    if (pcNpc <= 0) setFimDeJogo('vitoria');
+  }, [pcJogador, pcNpc, prontoParaJogar, fimDeJogo]);
 
   const jogadorJogarCarta = useCallback(async (nome) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nome);
@@ -363,6 +372,85 @@ export function useBattleState(npc) {
     return { carta: normalizada, sugestao: null };
   }, []);
 
+  const jogadorEquiparCarta = useCallback(async (nomeEquip, nomeAlvo) => {
+    const { carta: rawEquip } = await buscarCartaFuzzy(nomeEquip);
+    if (!rawEquip) return { ok: false, msg: `Equipamento "${nomeEquip}" não encontrado.` };
+    const equip = normalizeCardForSlot(rawEquip);
+    const nAlvo = normStr(nomeAlvo);
+    const idx = campoJogador.personagens.findIndex(c => {
+      if (!c) return false;
+      const cn = normStr(c.name);
+      return cn.includes(nAlvo) || nAlvo.includes(cn);
+    });
+    if (idx === -1) return { ok: false, msg: `Personagem "${nomeAlvo}" não está em campo.` };
+    const alvoNome = campoJogador.personagens[idx].name;
+    setCampoJogador(prev => {
+      const personagens = [...prev.personagens];
+      const alvo = personagens[idx];
+      personagens[idx] = { ...alvo, equipamentos: [...(alvo.equipamentos ?? []), equip] };
+      return { ...prev, personagens };
+    });
+    return { ok: true, equipNome: equip.name, alvoNome };
+  }, [campoJogador]);
+
+  const jogadorAtacar = useCallback((nomeAtacante, nomeAlvo) => {
+    const nAtk = normStr(nomeAtacante);
+    const nAlv = normStr(nomeAlvo);
+    const atacante = campoJogador.personagens.find(c => c && normStr(c.name).includes(nAtk));
+    if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
+    if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
+    const alvo = campoNpc.personagens.find(c => c && normStr(c.name).includes(nAlv));
+    if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
+    const { defensoraDestruida, atacanteDestruido, danoAoPC } = resolverCombate(atacante, alvo);
+    const addLog = (text, color = '#e8d5a8') =>
+      setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text, color }]);
+    if (defensoraDestruida) {
+      const pcPerdido = pcPerdidoPorDestruicao(alvo);
+      setPcNpc(p => Math.max(0, p - pcPerdido - danoAoPC));
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const i = personagens.findIndex(c => c?.name === alvo.name);
+        if (i !== -1) personagens[i] = null;
+        return { ...prev, personagens };
+      });
+      addLog(`[COMBATE] ${atacante.name} destruiu ${alvo.name}! NPC perde ${pcPerdido} PC.`, '#f5d27a');
+    } else {
+      addLog(`[COMBATE] ${atacante.name} atacou ${alvo.name} — não destruiu (DEF suficiente).`, '#a89870');
+    }
+    if (atacanteDestruido) {
+      const pcPerdido = pcPerdidoPorDestruicao(atacante);
+      setPcJogador(p => Math.max(0, p - pcPerdido));
+      setCampoJogador(prev => {
+        const personagens = [...prev.personagens];
+        const i = personagens.findIndex(c => c?.name === atacante.name);
+        if (i !== -1) personagens[i] = null;
+        return { ...prev, personagens };
+      });
+      addLog(`[COMBATE] ${atacante.name} foi destruído pelo contra-ataque! Você perde ${pcPerdido} PC.`, '#c84d2a');
+    }
+    return { ok: true };
+  }, [campoJogador, campoNpc]);
+
+  const jogadorAtaqueDireto = useCallback((nomeAtacante) => {
+    const nAtk = normStr(nomeAtacante);
+    const atacante = campoJogador.personagens.find(c => c && normStr(c.name).includes(nAtk));
+    if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
+    if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno.` };
+    const dano = atacante.atk ?? 0;
+    setPcNpc(p => Math.max(0, p - dano));
+    setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE DIRETO] ${atacante.name} causou ${dano} de dano direto ao NPC!`, color: '#f5d27a' }]);
+    return { ok: true, dano };
+  }, [campoJogador]);
+
+  const confirmarCombate = useCallback(() => {
+    setCombatePendente(prev => {
+      if (!prev) return null;
+      setPcJogador(p => Math.max(0, p - prev.dano));
+      setLog(logs => [...logs, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE] Confirmado — ${prev.atacanteNome} causou ${prev.dano} de dano.`, color: '#c84d2a' }]);
+      return null;
+    });
+  }, []);
+
   const iniciarJogo = useCallback((npcPrimeiro) => {
     npcComecouRef.current = npcPrimeiro;
     const mao5 = deckNpc.slice(0, 5);
@@ -378,7 +466,9 @@ export function useBattleState(npc) {
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
-    npcJogarCarta, jogadorJogarCarta,
+    combatePendente,
+    npcJogarCarta, jogadorJogarCarta, jogadorEquiparCarta,
+    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate,
     passarVez: npcExecutarTurno,
     iniciarJogo,
   };

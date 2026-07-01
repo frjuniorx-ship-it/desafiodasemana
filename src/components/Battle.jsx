@@ -20,14 +20,21 @@ export default function Battle({ npc, onGameOver, token }) {
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
-    passarVez, jogadorJogarCarta, iniciarJogo,
+    combatePendente,
+    passarVez, jogadorJogarCarta, jogadorEquiparCarta,
+    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate,
+    iniciarJogo,
   } = useBattleState(npc);
 
   const [zoomedCard, setZoomedCard] = useState(null);
   const [activeTab, setActiveTab] = useState('relato');
   const [chat, setChat] = useState([]);
   const [inputVal, setInputVal] = useState('');
+  const [micAtivo, setMicAtivo] = useState(false);
+  const [toast, setToast] = useState('');
   const chatRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const sendChatRef = useRef(null);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -43,17 +50,26 @@ export default function Battle({ npc, onGameOver, token }) {
     setZoomedCard(null);
   }
 
-  function sendChat() {
-    const text = inputVal.trim();
+  function processChat(text) {
     if (!text) return;
-    setInputVal('');
     setChat(prev => [...prev, { kind: 'player', text }]);
 
-    const matchJogar = /(jogu(ei|ar)|jogo|baixei|coloquei|desci)\s+(.+)/i.exec(text);
+    // Equipar — verificar ANTES de jogar (padrões sobrepõem)
+    const matchEquipar = /(equip(ei|o|ar)|equipei|coloquei|jogo)\s+(.+?)\s+(em|no|na|em cima|sobre)\s+(.+)/i.exec(text);
+    if (matchEquipar) {
+      const nomeEquip = matchEquipar[3].trim();
+      const nomeAlvo  = matchEquipar[5].trim();
+      jogadorEquiparCarta(nomeEquip, nomeAlvo).then(r => {
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
+      });
+      return;
+    }
+
+    // Jogar carta em campo
+    const matchJogar = /(jogu(ei|ar)|jogo|baixei|coloquei|desci|entrou)\s+(.+)/i.exec(text);
     if (matchJogar) {
       const nomeCarta = matchJogar[3].trim();
       jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
-        console.log('[DEBUG campoJogador]', campoJogador);
         if (carta) {
           setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
         } else if (sugestao) {
@@ -65,9 +81,107 @@ export default function Battle({ npc, onGameOver, token }) {
       return;
     }
 
+    // Atacar com
+    const matchAtacar = /(ataco|ataquei|ataque|atacando)\s+(.+?)\s+(com|usando)\s+(.+)/i.exec(text);
+    if (matchAtacar) {
+      const nomeAlvo = matchAtacar[2].trim();
+      const nomeAtk  = matchAtacar[4].trim();
+      const r = jogadorAtacar(nomeAtk, nomeAlvo);
+      setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque declarado.` : r.msg }]);
+      return;
+    }
+
+    // Ataque direto ao PC do NPC
+    const matchDireto = /(ataco|ataquei)\s+direto\s*(com\s+(.+))?/i.exec(text);
+    if (matchDireto) {
+      const nomeAtk = matchDireto[3]?.trim() ?? '';
+      if (nomeAtk) {
+        const r = jogadorAtaqueDireto(nomeAtk);
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
+      } else {
+        setChat(prev => [...prev, { kind: 'system', text: 'Indique o personagem: "ataco direto com [nome]".' }]);
+      }
+      return;
+    }
+
+    // Passar vez
+    if (/(passo|fim|termino|acabei|pr[oó]ximo turno)/i.test(text)) {
+      if (!vezDoNpc) passarVez();
+      setChat(prev => [...prev, { kind: 'system', text: 'Vez passada.' }]);
+      return;
+    }
+
+    // Confirmar combate pendente
+    if (/(confirmo|ok|aceito|sem resposta)/i.test(text)) {
+      if (combatePendente) {
+        confirmarCombate();
+        setChat(prev => [...prev, { kind: 'system', text: 'Combate confirmado.' }]);
+      } else {
+        setChat(prev => [...prev, { kind: 'system', text: 'Não há combate pendente para confirmar.' }]);
+      }
+      return;
+    }
+
+    // Responder/bloquear com carta
+    const matchResponder = /(respondo|bloqueio|ativo)\s+(.+)/i.exec(text);
+    if (matchResponder) {
+      const nomeCarta = matchResponder[2].trim();
+      jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
+        if (carta) {
+          if (combatePendente) confirmarCombate();
+          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado como resposta.` }]);
+        } else {
+          setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${nomeCarta}" não encontrada.` }]);
+        }
+      });
+      return;
+    }
+
+    // Nenhum padrão detectado → IA estratégica
     setTimeout(() => {
-      setChat(prev => [...prev, { kind: 'ai', text: 'Boa jogada. Observe a posição do oponente antes de confirmar.' }]);
+      setChat(prev => [...prev, { kind: 'ai', text: 'Observe o campo com cuidado antes de decidir sua próxima jogada.' }]);
     }, 1200);
+  }
+
+  function sendChat() {
+    const text = inputVal.trim();
+    if (!text) return;
+    setInputVal('');
+    processChat(text);
+  }
+
+  sendChatRef.current = processChat;
+
+  function toggleMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setToast('Seu navegador não suporta entrada por voz. Use Chrome.');
+      setTimeout(() => setToast(''), 3500);
+      return;
+    }
+    if (micAtivo) {
+      recognitionRef.current?.stop();
+      setMicAtivo(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'pt-BR';
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.onresult = e => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+      setInputVal(transcript);
+      if (e.results[e.results.length - 1].isFinal) {
+        setInputVal('');
+        setMicAtivo(false);
+        sendChatRef.current?.(transcript.trim());
+      }
+    };
+    rec.onerror = () => setMicAtivo(false);
+    rec.onend = () => setMicAtivo(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setMicAtivo(true);
   }
 
   useEffect(() => {
@@ -206,7 +320,7 @@ export default function Battle({ npc, onGameOver, token }) {
             {/* Linha divisória */}
             <div style={{ height: 2, flexShrink: 0, background: 'linear-gradient(90deg, transparent, rgba(212,168,87,.5) 20%, rgba(212,168,87,.85) 50%, rgba(212,168,87,.5) 80%, transparent)', position: 'relative' }}>
               <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 5 }}>
-                <PassTurnButton onClick={passarVez} disabled={vezDoNpc} />
+                <PassTurnButton onClick={passarVez} disabled={vezDoNpc || !!combatePendente} />
               </div>
             </div>
 
@@ -293,7 +407,11 @@ export default function Battle({ npc, onGameOver, token }) {
                 {chat.map((m, i) => <ChatBubble key={i} msg={m} />)}
               </div>
               <div style={{ padding: '8px 8px 10px', flexShrink: 0, borderTop: '1px solid rgba(212,168,87,.18)', display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(10,18,12,.4)' }}>
-                <button style={{ width: 38, height: 38, flexShrink: 0, borderRadius: '50%', background: 'linear-gradient(180deg, #2a3e2a, #1a2e22)', border: '1.5px solid #c89b3c', color: '#d4a857', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'micPulse 1.8s ease-in-out infinite', fontSize: 16 }} title="Gravar voz">🎙</button>
+                <button
+                  onClick={toggleMic}
+                  title={micAtivo ? 'Parar gravação' : 'Gravar voz'}
+                  style={{ width: 38, height: 38, flexShrink: 0, borderRadius: '50%', background: micAtivo ? 'radial-gradient(circle, #c89b3c, #8a5d1f)' : 'linear-gradient(180deg, #2a3e2a, #1a2e22)', border: `1.5px solid ${micAtivo ? '#f5d27a' : '#c89b3c'}`, color: micAtivo ? '#0b1612' : '#d4a857', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', animation: micAtivo ? 'micPulse 1.8s ease-in-out infinite' : 'none', boxShadow: micAtivo ? '0 0 12px rgba(245,210,122,.6)' : 'none', transition: 'background .2s, box-shadow .2s' }}
+                >🎙</button>
                 <input
                   type="text"
                   value={inputVal}
@@ -347,6 +465,11 @@ export default function Battle({ npc, onGameOver, token }) {
               VOLTAR AOS DESAFIOS
             </button>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '10px 20px', borderRadius: 8, background: 'rgba(13,27,42,.95)', border: '1px solid rgba(212,168,87,.5)', fontFamily: "'Lora', serif", fontSize: 13, color: '#e8d5a8', boxShadow: '0 4px 20px rgba(0,0,0,.6)', whiteSpace: 'nowrap' }}>
+          {toast}
         </div>
       )}
     </main>
