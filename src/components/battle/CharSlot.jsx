@@ -25,7 +25,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom }) {
       onClick={() => filled && onZoom && onZoom(card)}
       onMouseEnter={() => filled && onZoom && onZoom(card)}
       style={{
-        position: 'relative', height: 96, borderRadius: 6,
+        position: 'relative', aspectRatio: '5/7', width: '100%', borderRadius: 6,
         border, background, boxShadow,
         display: 'flex', flexDirection: 'column', padding: 5, overflow: 'hidden',
         cursor: filled ? 'pointer' : 'default',
@@ -38,7 +38,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom }) {
         <>
           <div style={{ flex: 1, borderRadius: 4, position: 'relative', overflow: 'hidden', background: `repeating-linear-gradient(125deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px), radial-gradient(ellipse at 50% 35%, ${portraitLight}, ${portraitDark} 70%, #0b1612)` }}>
             {card.imagem_url && (
-              <img src={card.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', opacity: .9 }} />
+              <img src={card.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', opacity: .9 }} />
             )}
             <div style={{ position: 'absolute', top: 3, left: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: accentColor, opacity: .9, textShadow: '0 1px 2px rgba(0,0,0,.8)' }}>★{card.atk ?? 0}</div>
             <div style={{ position: 'absolute', top: 3, right: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#a8c8e8', opacity: .9, textShadow: '0 1px 2px rgba(0,0,0,.8)' }}>◆{card.def ?? 0}</div>

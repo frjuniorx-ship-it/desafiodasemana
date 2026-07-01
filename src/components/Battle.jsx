@@ -62,14 +62,14 @@ export default function Battle({ npc }) {
   }
 
   return (
-    <main style={{ padding: '14px 14px 24px', maxWidth: 1500, margin: '0 auto' }}>
-      <div className="battle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 14 }}>
+    <main style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '8px 14px 0', boxSizing: 'border-box' }}>
+      <div className="battle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 14, flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
         {/* ===== COLUNA ESQUERDA ===== */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, height: '100%', overflow: 'hidden' }}>
 
           {/* Banner do NPC */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'linear-gradient(180deg, rgba(38,20,40,.6), rgba(20,12,28,.4))', border: '1px solid rgba(150,90,160,.35)', borderRadius: 10 }}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '6px 14px', background: 'linear-gradient(180deg, rgba(38,20,40,.6), rgba(20,12,28,.4))', border: '1px solid rgba(150,90,160,.35)', borderRadius: 10 }}>
             <div style={{ width: 54, height: 54, flexShrink: 0, borderRadius: '50%', overflow: 'hidden', border: `2px solid ${npcColor}`, boxShadow: `0 0 14px ${npcColor}88`, background: `radial-gradient(circle, ${npcColor}44, #0b1612)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {npcImg
                 ? <img src={npcImg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} />
@@ -97,7 +97,7 @@ export default function Battle({ npc }) {
           </div>
 
           {/* Mão do NPC */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'linear-gradient(180deg, rgba(38,20,28,.45), rgba(20,12,16,.35))', border: '1px solid rgba(200,77,42,.28)', borderRadius: 10 }}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px', background: 'linear-gradient(180deg, rgba(38,20,28,.45), rgba(20,12,16,.35))', border: '1px solid rgba(200,77,42,.28)', borderRadius: 10 }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.22em', color: '#a85040', writingMode: 'vertical-rl', transform: 'rotate(180deg)', flexShrink: 0 }}>MÃO DO NPC · 5</div>
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8, maxWidth: 480 }}>
               {deckLoading
@@ -117,10 +117,37 @@ export default function Battle({ npc }) {
           </div>
 
           {/* Tabuleiro */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', overflow: 'hidden', gap: 0 }}>
+
+            {/* PC Sidebar */}
+            <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-around', padding: '8px 4px', borderRight: '1px solid rgba(212,168,87,.18)', marginRight: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.11em', color: '#a85040', textAlign: 'center', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{npcName.toUpperCase()}</div>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 1, height: 16, background: 'rgba(212,168,87,.3)' }} />
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#5a5040', letterSpacing: '.1em' }}>META 20</div>
+                <div style={{ width: 1, height: 16, background: 'rgba(212,168,87,.3)' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.11em', color: '#5a8a4a', textAlign: 'center' }}>VOCÊ</div>
+              </div>
+            </div>
+
+            {/* Board Content */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', position: 'relative' }}>
 
             {/* Campo do NPC */}
-            <div style={{ background: 'radial-gradient(ellipse at center, rgba(80,20,30,.35), transparent 75%), linear-gradient(180deg, rgba(38,20,28,.5), rgba(20,12,16,.3))', border: '1px solid rgba(200,77,42,.3)', borderRadius: 12, padding: 12 }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(80,20,30,.35), transparent 75%), linear-gradient(180deg, rgba(38,20,28,.5), rgba(20,12,16,.3))', border: '1px solid rgba(200,77,42,.3)', borderRadius: 12, padding: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#a85040' }}>▲ CAMPO DO {npcName.toUpperCase()}</div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -128,7 +155,7 @@ export default function Battle({ npc }) {
                   <SmallSlot label="ESQUEC." faceUp={esquecimentoNpc.length > 0} cardName={esquecimentoNpc[esquecimentoNpc.length - 1]?.name} />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8, alignItems: 'stretch' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                   <UtilSlot kind="folc" count={campoNpc.folcloricas.length} side="npc" />
                   <UtilSlot kind="acao" filled={!!campoNpc.acao} side="npc" />
@@ -148,20 +175,16 @@ export default function Battle({ npc }) {
               </div>
             </div>
 
-            {/* Faixa central de PC */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 10px', background: 'linear-gradient(90deg, rgba(80,20,30,.25), rgba(13,27,42,.4) 50%, rgba(26,46,34,.25))', border: '1px solid rgba(212,168,87,.25)', borderRadius: 10 }}>
-              <PCMedallion value={pcNpc} label={npcName.toUpperCase()} delta="" deltaColor="#a85040" />
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '0 4px', flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
-                <div style={{ width: 30, height: 1, background: '#c89b3c' }} />
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#5a5040', letterSpacing: '.15em' }}>META 20</div>
+            {/* Linha divisória */}
+            <div style={{ height: 2, flexShrink: 0, background: 'linear-gradient(90deg, transparent, rgba(212,168,87,.5) 20%, rgba(212,168,87,.85) 50%, rgba(212,168,87,.5) 80%, transparent)', position: 'relative' }}>
+              <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 5 }}>
+                <PassTurnButton />
               </div>
-              <PCMedallion value={pcJogador} label="VOCÊ" delta="" deltaColor="#5a8a4a" right />
             </div>
 
             {/* Campo do jogador */}
-            <div style={{ background: 'radial-gradient(ellipse at center, rgba(26,46,34,.4), transparent 75%), linear-gradient(0deg, rgba(26,46,34,.55), rgba(15,31,23,.35))', border: '1px solid rgba(90,138,74,.4)', borderRadius: 12, padding: 12 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(26,46,34,.4), transparent 75%), linear-gradient(0deg, rgba(26,46,34,.55), rgba(15,31,23,.35))', border: '1px solid rgba(90,138,74,.4)', borderRadius: 12, padding: 10 }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8, alignItems: 'stretch' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                   <UtilSlot kind="folc" count={campoJogador.folcloricas.length} side="player" />
                   <UtilSlot kind="acao" filled={!!campoJogador.acao} side="player" />
@@ -187,16 +210,12 @@ export default function Battle({ npc }) {
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#5a8a4a' }}>▼ SEU CAMPO</div>
               </div>
             </div>
-          </div>
-
-          {/* Botão PASSAR A VEZ */}
-          <div style={{ position: 'sticky', bottom: 14, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', marginTop: 6, zIndex: 6 }}>
-            <PassTurnButton />
-          </div>
+            </div>{/* fecha board content */}
+          </div>{/* fecha tabuleiro row */}
         </div>
 
         {/* ===== SIDEBAR DIREITA ===== */}
-        <aside className="battle-sidebar" style={{ position: 'sticky', top: 14, alignSelf: 'start', maxWidth: 360, height: 'calc(100vh - 100px)', minHeight: 520 }}>
+        <aside className="battle-sidebar" style={{ height: '100%', maxWidth: 360, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateRows: 'minmax(90px,auto) minmax(220px,1fr) minmax(220px,1fr)', gap: 10, height: '100%' }}>
 
             {/* Log de batalha */}
@@ -285,17 +304,17 @@ function PassTurnButton() {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        pointerEvents: 'auto',
+        width: 160, height: 36,
         background: 'radial-gradient(ellipse at 50% 0%, #f5d27a, #c89b3c 40%, #8a5d1f 90%)',
-        border: '2px solid #f5d27a', color: '#0b1612',
-        fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 13, letterSpacing: '.22em',
-        padding: '14px 22px', borderRadius: 30,
+        border: '1.5px solid #f5d27a', color: '#0b1612',
+        fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, letterSpacing: '.16em',
+        padding: '0 10px', borderRadius: 18,
         boxShadow: hovered
-          ? '0 0 32px rgba(200,155,60,.7), inset 0 -3px 8px rgba(0,0,0,.3), inset 0 2px 4px rgba(255,240,200,.6), 0 6px 0 #0b1612'
-          : '0 0 22px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.3), inset 0 2px 4px rgba(255,240,200,.6), 0 4px 0 #0b1612',
+          ? '0 0 24px rgba(200,155,60,.7), inset 0 -2px 6px rgba(0,0,0,.3), inset 0 2px 3px rgba(255,240,200,.6), 0 4px 0 #0b1612'
+          : '0 0 16px rgba(200,155,60,.55), inset 0 -2px 6px rgba(0,0,0,.3), inset 0 2px 3px rgba(255,240,200,.6), 0 3px 0 #0b1612',
         textShadow: '0 1px 0 rgba(255,240,200,.4)',
-        display: 'flex', alignItems: 'center', gap: 8,
-        transform: hovered ? 'translateY(-2px)' : '',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, whiteSpace: 'nowrap',
+        transform: hovered ? 'translateY(-1px)' : '',
         transition: 'transform .15s, box-shadow .15s',
       }}
     >
