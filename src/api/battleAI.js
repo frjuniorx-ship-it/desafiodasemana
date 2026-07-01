@@ -1,57 +1,104 @@
-const AI_KEY = import.meta.env.VITE_ANTHROPIC_KEY ?? '';
-const MODEL = 'claude-haiku-4-5-20251001';
+// Parser local de ações — zero custo, zero chamadas externas
+export function processarAcaoBatalha(texto, estadoCampo) {
+  const t = texto.trim().toLowerCase();
 
-const SYSTEM = `Você é o narrador estratégico de "Lendas & Batalhas", jogo de cartas da cultura brasileira.
-Analise o estado do campo e a mensagem do jogador. Retorne SOMENTE um JSON com a ação.
-
-Ações válidas:
-{ "acao": "jogar", "carta": "<nome exato>" }
-{ "acao": "atacar", "atacante": "<nome>", "alvo": "<nome>" }
-{ "acao": "ataque_direto", "atacante": "<nome>" }
-{ "acao": "equipar", "equipamento": "<nome>", "alvo": "<nome do personagem>" }
-{ "acao": "confirmar" }
-{ "acao": "passar" }
-{ "acao": "responder", "texto": "<comentário estratégico em português, máx 2 frases>" }
-
-Retorne SOMENTE o JSON, sem markdown, sem texto adicional.`;
-
-export async function processarAcaoBatalha(mensagem, estado) {
-  if (!AI_KEY) {
-    return { acao: 'responder', texto: 'Configure VITE_ANTHROPIC_KEY no .env para habilitar a IA.' };
+  // PASSAR VEZ
+  if (/^(passo|fim|termino|acabei|próximo turno|pass)/.test(t)) {
+    return { acao: 'passar_vez' };
   }
 
-  const content = `Estado do campo:\n${JSON.stringify(estado, null, 2)}\n\nJogador: "${mensagem}"`;
+  // CONFIRMAR COMBATE
+  if (/^(confirmo|ok|aceito|sem resposta|confirmar)/.test(t)) {
+    return { acao: 'confirmar_combate' };
+  }
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': AI_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 256,
-        system: SYSTEM,
-        messages: [{ role: 'user', content }],
-      }),
-    });
+  // ATACAR COM CARTA ESPECÍFICA
+  const mAtacar = t.match(/(?:ataco|ataquei|ataque|atacando)\s+(.+?)\s+(?:com|usando)\s+(.+)/);
+  if (mAtacar) {
+    return { acao: 'atacar', alvo: mAtacar[1].trim(), carta: mAtacar[2].trim() };
+  }
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error('[battleAI]', res.status, err);
-      return { acao: 'responder', texto: 'A IA está indisponível no momento.' };
+  // ATAQUE DIRETO
+  if (/(?:ataco|ataquei)\s+direto/.test(t) ||
+      /ataco\s+(?:o\s+)?(?:pc|pontos)/.test(t)) {
+    return { acao: 'ataque_direto' };
+  }
+
+  // ATACAR SEM ESPECIFICAR CARTA (usa primeiro disponível)
+  const mAtacarSimples = t.match(/^(?:ataco|ataquei|ataque)\s+(.+)/);
+  if (mAtacarSimples) {
+    return { acao: 'atacar', alvo: mAtacarSimples[1].trim(), carta: null };
+  }
+
+  // EQUIPAR
+  const mEquipar = t.match(/(?:equip(?:ei|o)|coloco|jogo)\s+(.+?)\s+(?:em|no|na|sobre|em cima de)\s+(.+)/);
+  if (mEquipar) {
+    return { acao: 'equipar', carta: mEquipar[1].trim(), alvo: mEquipar[2].trim() };
+  }
+
+  // ATIVAR PLANTA
+  const mPlanta = t.match(/(?:ativo|ativa|uso)\s+(?:a\s+planta\s+)?(.+)/);
+  if (mPlanta) {
+    return { acao: 'ativar_planta', carta: mPlanta[1].trim() };
+  }
+
+  // DESCARTAR (para folclóricas)
+  const mDescartar = t.match(/(?:descarto|descartar)\s+(.+)/);
+  if (mDescartar) {
+    return { acao: 'descartar', carta: mDescartar[1].trim() };
+  }
+
+  // JOGAR CARTA (padrão mais genérico, deve vir por último)
+  const mJogar = t.match(/(?:jogu(?:ei|ar)|jogo|baixei|coloquei|desci|entrou|uso a carta)\s+(.+)/);
+  if (mJogar) {
+    let nome = mJogar[1].trim();
+    // Remover "em campo", "no campo", "na área" do final
+    nome = nome.replace(/\s+(?:em|no|na)\s+(?:campo|área|espaço).*/i, '').trim();
+    // Detectar equipamento junto ("joguei Tibiriçá equipado com Arco & Flecha")
+    const mComEquip = nome.match(/(.+?)\s+equipad[oa]\s+com\s+(.+)/i);
+    if (mComEquip) {
+      return {
+        acao: 'jogar_com_equipamento',
+        carta: mComEquip[1].trim(),
+        equipamento: mComEquip[2].trim(),
+      };
     }
-
-    const data = await res.json();
-    const raw = (data.content?.[0]?.text ?? '').trim();
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return { acao: 'responder', texto: raw || 'Sem resposta da IA.' };
-    return JSON.parse(match[0]);
-  } catch (e) {
-    console.error('[battleAI] exceção:', e);
-    return { acao: 'responder', texto: 'Erro de conexão com a IA.' };
+    return { acao: 'jogar_carta', carta: nome };
   }
+
+  // REMOVER/SUBSTITUIR
+  const mRemover = t.match(/(?:remov[oi]|substituo|troco)\s+(.+)/);
+  if (mRemover) {
+    return { acao: 'remover', carta: mRemover[1].trim() };
+  }
+
+  // Não reconheceu — retorna null pra mostrar ajuda
+  return null;
+}
+
+// Gera dica contextual baseada no estado do campo — sem IA, lógica pura
+export function gerarDicaContextual(estadoCampo) {
+  const { pcNpc, pcJogador, campoNpc, campoJogador } = estadoCampo;
+
+  // Situação de lethal
+  const ataqueTotal = campoJogador.personagens
+    .filter(Boolean)
+    .filter(c => !c.entrou_turno_atual)
+    .reduce((acc, c) => acc + (c.atk || c.atq || c.ataque || 0), 0);
+  if (ataqueTotal >= pcNpc && campoNpc.personagens.filter(Boolean).length === 0) {
+    return `⚔️ Você pode vencer agora! Ataque direto com todos (${ataqueTotal} de dano vs ${pcNpc} PC).`;
+  }
+
+  // NPC com PC baixo
+  if (pcNpc <= 5) return `🎯 NPC com ${pcNpc} PC — pressione o ataque!`;
+
+  // Jogador com PC baixo
+  if (pcJogador <= 5) return `⚠️ Você está com ${pcJogador} PC — jogue cartas de defesa ou bloqueio.`;
+
+  // Campo vazio do NPC
+  if (campoNpc.personagens.filter(Boolean).length === 0) {
+    return `🏹 Campo do NPC vazio — você pode atacar direto nos PC!`;
+  }
+
+  return null;
 }

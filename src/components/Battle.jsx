@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
-import { useBattleState } from '../hooks/useBattleState.js';
-import { processarAcaoBatalha } from '../api/battleAI.js';
+import { useBattleState, normStr } from '../hooks/useBattleState.js';
+import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
 import SmallSlot from './battle/SmallSlot';
@@ -51,169 +51,100 @@ export default function Battle({ npc, onGameOver, token }) {
     setZoomedCard(null);
   }
 
-  function processChat(text) {
-    if (!text) return;
-    setChat(prev => [...prev, { kind: 'player', text }]);
-
-    // Equipar — verificar ANTES de jogar (padrões sobrepõem)
-    const matchEquipar = /(equip(ei|o|ar)|equipei|coloquei|jogo)\s+(.+?)\s+(em|no|na|em cima|sobre)\s+(.+)/i.exec(text);
-    if (matchEquipar) {
-      const nomeEquip = matchEquipar[3].trim();
-      const nomeAlvo  = matchEquipar[5].trim();
-      jogadorEquiparCarta(nomeEquip, nomeAlvo).then(r => {
-        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
-      });
-      return;
-    }
-
-    // Jogar carta em campo
-    const matchJogar = /(jogu(ei|ar)|jogo|baixei|coloquei|desci|entrou)\s+(.+)/i.exec(text);
-    if (matchJogar) {
-      const nomeCarta = matchJogar[3].trim();
-      jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
-        if (carta) {
-          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
-        } else if (sugestao) {
-          setChat(prev => [...prev, { kind: 'system', text: `Não encontrei "${nomeCarta}". Você quis dizer "${sugestao}"?` }]);
-        } else {
-          setChat(prev => [...prev, { kind: 'system', text: `Carta "${nomeCarta}" não encontrada.` }]);
-        }
-      });
-      return;
-    }
-
-    // Atacar com
-    const matchAtacar = /(ataco|ataquei|ataque|atacando)\s+(.+?)\s+(com|usando)\s+(.+)/i.exec(text);
-    if (matchAtacar) {
-      const nomeAlvo = matchAtacar[2].trim();
-      const nomeAtk  = matchAtacar[4].trim();
-      const r = jogadorAtacar(nomeAtk, nomeAlvo);
-      setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque declarado.` : r.msg }]);
-      return;
-    }
-
-    // Ataque direto ao PC do NPC
-    const matchDireto = /(ataco|ataquei)\s+direto\s*(com\s+(.+))?/i.exec(text);
-    if (matchDireto) {
-      const nomeAtk = matchDireto[3]?.trim() ?? '';
-      if (nomeAtk) {
-        const r = jogadorAtaqueDireto(nomeAtk);
-        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
-      } else {
-        setChat(prev => [...prev, { kind: 'system', text: 'Indique o personagem: "ataco direto com [nome]".' }]);
-      }
-      return;
-    }
-
-    // Passar vez
-    if (/(passo|fim|termino|acabei|pr[oó]ximo turno)/i.test(text)) {
-      if (!vezDoNpc) passarVez();
-      setChat(prev => [...prev, { kind: 'system', text: 'Vez passada.' }]);
-      return;
-    }
-
-    // Confirmar combate pendente
-    if (/(confirmo|ok|aceito|sem resposta)/i.test(text)) {
-      if (combatePendente) {
-        confirmarCombate();
-        setChat(prev => [...prev, { kind: 'system', text: 'Combate confirmado.' }]);
-      } else {
-        setChat(prev => [...prev, { kind: 'system', text: 'Não há combate pendente para confirmar.' }]);
-      }
-      return;
-    }
-
-    // Responder/bloquear com carta
-    const matchResponder = /(respondo|bloqueio|ativo)\s+(.+)/i.exec(text);
-    if (matchResponder) {
-      const nomeCarta = matchResponder[2].trim();
-      jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
-        if (carta) {
-          if (combatePendente) {
-            const atkCard = campoNpc.personagens.find(c => c?.name === combatePendente.atacanteNome);
-            if (atkCard) aplicarResultadoCombate(atkCard, carta);
-            else confirmarCombate();
-            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} usado como resposta ao ataque de ${combatePendente.atacanteNome}.` }]);
-          } else {
-            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado.` }]);
-          }
-        } else {
-          setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${nomeCarta}" não encontrada.` }]);
-        }
-      });
-      return;
-    }
-
-    // Nenhum padrão detectado → IA com contexto completo do jogo
-    const estado = {
-      turno, pcJogador, pcNpc, oponente: npcName,
-      combatePendente,
-      campoJogador: {
-        personagens: campoJogador.personagens.filter(Boolean).map(c => ({ nome: c.name, atk: c.atk, def: c.def })),
-        plantas: campoJogador.plantas.filter(Boolean).map(c => ({ nome: c.name })),
-        acao: campoJogador.acao?.name ?? null,
-        folcloricas: campoJogador.folcloricas.length,
-      },
-      campoNpc: {
-        personagens: campoNpc.personagens.filter(Boolean).map(c => ({ nome: c.name, atk: c.atk, def: c.def })),
-        plantas: campoNpc.plantas.filter(Boolean).map(c => ({ nome: c.name, oculta: !!c.oculta })),
-        acao: campoNpc.acao?.name ?? null,
-        folcloricas: campoNpc.folcloricas.length,
-      },
-    };
-    processarAcaoBatalha(text, estado).then(resultado => {
-      switch (resultado.acao) {
-        case 'jogar':
-          if (resultado.carta) {
-            jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
-              setChat(prev => [...prev, { kind: 'ai', text: carta
-                ? `[IA] Jogando ${carta.name} em campo.`
-                : sugestao ? `[IA] Você quis dizer "${sugestao}"?`
-                : `[IA] Não encontrei "${resultado.carta}".` }]);
-            });
-          }
-          break;
-        case 'atacar':
-          if (resultado.atacante && resultado.alvo) {
-            const r = jogadorAtacar(resultado.atacante, resultado.alvo);
-            setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] ${resultado.atacante} atacou ${resultado.alvo}.` : `[IA] ${r.msg}` }]);
-          }
-          break;
-        case 'ataque_direto':
-          if (resultado.atacante) {
-            const r = jogadorAtaqueDireto(resultado.atacante);
-            setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] Ataque direto! ${r.dano} de dano ao NPC.` : `[IA] ${r.msg}` }]);
-          }
-          break;
-        case 'equipar':
-          if (resultado.equipamento && resultado.alvo) {
-            jogadorEquiparCarta(resultado.equipamento, resultado.alvo).then(r => {
-              setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] ${r.equipNome} equipado em ${r.alvoNome}.` : `[IA] ${r.msg}` }]);
-            });
-          }
-          break;
-        case 'confirmar':
-          if (combatePendente) confirmarCombate();
-          setChat(prev => [...prev, { kind: 'ai', text: '[IA] Combate confirmado.' }]);
-          break;
-        case 'passar':
-          if (!vezDoNpc) passarVez();
-          setChat(prev => [...prev, { kind: 'ai', text: '[IA] Vez passada.' }]);
-          break;
-        default:
-          setChat(prev => [...prev, { kind: 'ai', text: resultado.texto ?? '[IA] Analise o campo e decida sua jogada.' }]);
-      }
-    });
-  }
-
-  function sendChat() {
-    const text = inputVal.trim();
+  function sendChat(textoOverride) {
+    const text = (typeof textoOverride === 'string' ? textoOverride : inputVal).trim();
     if (!text) return;
     setInputVal('');
-    processChat(text);
+    setChat(prev => [...prev, { kind: 'player', text }]);
+
+    const estado = { turno, nomeNpc: npcName, pcNpc, pcJogador, campoNpc, campoJogador, combatePendente };
+    const resultado = processarAcaoBatalha(text, estado);
+
+    if (!resultado) {
+      const dica = gerarDicaContextual(estado);
+      setChat(prev => [...prev, { kind: 'ai', text: 'Não entendi. Tente: "joguei [carta]", "ataco [alvo] com [carta]", "equipei [X] no [Y]", "passo".' }]);
+      if (dica) setChat(prev => [...prev, { kind: 'ai', text: dica }]);
+      return;
+    }
+
+    switch (resultado.acao) {
+      case 'jogar_carta': {
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
+          if (carta) setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
+          else setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+        });
+        break;
+      }
+      case 'jogar_com_equipamento': {
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
+          if (carta) {
+            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
+            jogadorEquiparCarta(resultado.equipamento, resultado.carta).then(rE => {
+              if (rE.ok) setChat(prev => [...prev, { kind: 'system', text: `${rE.equipNome} equipado em ${rE.alvoNome}.` }]);
+            });
+          } else {
+            setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+          }
+        });
+        break;
+      }
+      case 'atacar': {
+        const cartaNome = resultado.carta
+          || campoJogador.personagens.find(c => c && !c.entrou_turno_atual)?.name;
+        if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
+        const r = jogadorAtacar(cartaNome, resultado.alvo);
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${cartaNome} em ${resultado.alvo}.` : r.msg }]);
+        break;
+      }
+      case 'ataque_direto': {
+        const atacante = resultado.carta
+          ? campoJogador.personagens.find(c => c && normStr(c.name).includes(normStr(resultado.carta)))
+          : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
+        if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
+        const r = jogadorAtaqueDireto(atacante.name);
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
+        break;
+      }
+      case 'equipar': {
+        jogadorEquiparCarta(resultado.carta, resultado.alvo).then(r => {
+          setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
+        });
+        break;
+      }
+      case 'ativar_planta': {
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
+          if (carta) setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado.` }]);
+          else setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+        });
+        break;
+      }
+      case 'descartar':
+        setChat(prev => [...prev, { kind: 'ai', text: 'Descarte manual não implementado. Use folclóricas para descartar.' }]);
+        break;
+      case 'remover':
+        setChat(prev => [...prev, { kind: 'ai', text: 'Remoção manual não disponível.' }]);
+        break;
+      case 'passar_vez':
+        if (!vezDoNpc) passarVez();
+        setChat(prev => [...prev, { kind: 'system', text: 'Vez passada.' }]);
+        break;
+      case 'confirmar_combate':
+        if (combatePendente) {
+          confirmarCombate();
+          setChat(prev => [...prev, { kind: 'system', text: 'Combate confirmado.' }]);
+        } else {
+          setChat(prev => [...prev, { kind: 'ai', text: 'Não há combate pendente para confirmar.' }]);
+        }
+        break;
+      default:
+        setChat(prev => [...prev, { kind: 'ai', text: 'Ação não reconhecida.' }]);
+    }
+
+    const dica = gerarDicaContextual(estado);
+    if (dica) setChat(prev => [...prev, { kind: 'ai', text: dica }]);
   }
 
-  sendChatRef.current = processChat;
+  sendChatRef.current = sendChat;
 
   function toggleMic() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

@@ -8,7 +8,7 @@ import {
   SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
 } from '../engine/rules.js';
 
-const normStr = s =>
+export const normStr = s =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[-_]/g, ' ').trim();
 
 async function buscarCartaFuzzy(nome) {
