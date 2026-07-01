@@ -451,6 +451,34 @@ export function useBattleState(npc) {
     });
   }, []);
 
+  const aplicarResultadoCombate = useCallback((atacanteCard, defensoraCard) => {
+    const { defensoraDestruida, atacanteDestruido, danoAoPC } = resolverCombate(atacanteCard, defensoraCard);
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    if (defensoraDestruida) {
+      const pc = pcPerdidoPorDestruicao(defensoraCard) + danoAoPC;
+      setPcJogador(p => Math.max(0, p - pc));
+      setCampoJogador(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c),
+      }));
+      addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! Você perde ${pc} PC.`, '#c84d2a');
+    } else {
+      addLog(`[COMBATE] ${defensoraCard.name} resistiu ao ataque de ${atacanteCard.name}!`, '#8ac46a');
+    }
+    if (atacanteDestruido) {
+      const pc = pcPerdidoPorDestruicao(atacanteCard);
+      setPcNpc(p => Math.max(0, p - pc));
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c),
+      }));
+      addLog(`[COMBATE] ${defensoraCard.name} contra-atacou e destruiu ${atacanteCard.name}! NPC perde ${pc} PC.`, '#f5d27a');
+    }
+    setCombatePendente(null);
+    return { defensoraDestruida, atacanteDestruido };
+  }, []);
+
   const iniciarJogo = useCallback((npcPrimeiro) => {
     npcComecouRef.current = npcPrimeiro;
     const mao5 = deckNpc.slice(0, 5);
@@ -468,7 +496,7 @@ export function useBattleState(npc) {
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
     npcJogarCarta, jogadorJogarCarta, jogadorEquiparCarta,
-    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate,
+    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     passarVez: npcExecutarTurno,
     iniciarJogo,
   };

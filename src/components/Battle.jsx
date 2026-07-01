@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState } from '../hooks/useBattleState.js';
+import { processarAcaoBatalha } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
 import SmallSlot from './battle/SmallSlot';
@@ -22,7 +23,7 @@ export default function Battle({ npc, onGameOver, token }) {
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
     passarVez, jogadorJogarCarta, jogadorEquiparCarta,
-    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate,
+    jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     iniciarJogo,
   } = useBattleState(npc);
 
@@ -128,8 +129,14 @@ export default function Battle({ npc, onGameOver, token }) {
       const nomeCarta = matchResponder[2].trim();
       jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
         if (carta) {
-          if (combatePendente) confirmarCombate();
-          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado como resposta.` }]);
+          if (combatePendente) {
+            const atkCard = campoNpc.personagens.find(c => c?.name === combatePendente.atacanteNome);
+            if (atkCard) aplicarResultadoCombate(atkCard, carta);
+            else confirmarCombate();
+            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} usado como resposta ao ataque de ${combatePendente.atacanteNome}.` }]);
+          } else {
+            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado.` }]);
+          }
         } else {
           setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${nomeCarta}" não encontrada.` }]);
         }
@@ -137,10 +144,66 @@ export default function Battle({ npc, onGameOver, token }) {
       return;
     }
 
-    // Nenhum padrão detectado → IA estratégica
-    setTimeout(() => {
-      setChat(prev => [...prev, { kind: 'ai', text: 'Observe o campo com cuidado antes de decidir sua próxima jogada.' }]);
-    }, 1200);
+    // Nenhum padrão detectado → IA com contexto completo do jogo
+    const estado = {
+      turno, pcJogador, pcNpc, oponente: npcName,
+      combatePendente,
+      campoJogador: {
+        personagens: campoJogador.personagens.filter(Boolean).map(c => ({ nome: c.name, atk: c.atk, def: c.def })),
+        plantas: campoJogador.plantas.filter(Boolean).map(c => ({ nome: c.name })),
+        acao: campoJogador.acao?.name ?? null,
+        folcloricas: campoJogador.folcloricas.length,
+      },
+      campoNpc: {
+        personagens: campoNpc.personagens.filter(Boolean).map(c => ({ nome: c.name, atk: c.atk, def: c.def })),
+        plantas: campoNpc.plantas.filter(Boolean).map(c => ({ nome: c.name, oculta: !!c.oculta })),
+        acao: campoNpc.acao?.name ?? null,
+        folcloricas: campoNpc.folcloricas.length,
+      },
+    };
+    processarAcaoBatalha(text, estado).then(resultado => {
+      switch (resultado.acao) {
+        case 'jogar':
+          if (resultado.carta) {
+            jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
+              setChat(prev => [...prev, { kind: 'ai', text: carta
+                ? `[IA] Jogando ${carta.name} em campo.`
+                : sugestao ? `[IA] Você quis dizer "${sugestao}"?`
+                : `[IA] Não encontrei "${resultado.carta}".` }]);
+            });
+          }
+          break;
+        case 'atacar':
+          if (resultado.atacante && resultado.alvo) {
+            const r = jogadorAtacar(resultado.atacante, resultado.alvo);
+            setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] ${resultado.atacante} atacou ${resultado.alvo}.` : `[IA] ${r.msg}` }]);
+          }
+          break;
+        case 'ataque_direto':
+          if (resultado.atacante) {
+            const r = jogadorAtaqueDireto(resultado.atacante);
+            setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] Ataque direto! ${r.dano} de dano ao NPC.` : `[IA] ${r.msg}` }]);
+          }
+          break;
+        case 'equipar':
+          if (resultado.equipamento && resultado.alvo) {
+            jogadorEquiparCarta(resultado.equipamento, resultado.alvo).then(r => {
+              setChat(prev => [...prev, { kind: 'ai', text: r.ok ? `[IA] ${r.equipNome} equipado em ${r.alvoNome}.` : `[IA] ${r.msg}` }]);
+            });
+          }
+          break;
+        case 'confirmar':
+          if (combatePendente) confirmarCombate();
+          setChat(prev => [...prev, { kind: 'ai', text: '[IA] Combate confirmado.' }]);
+          break;
+        case 'passar':
+          if (!vezDoNpc) passarVez();
+          setChat(prev => [...prev, { kind: 'ai', text: '[IA] Vez passada.' }]);
+          break;
+        default:
+          setChat(prev => [...prev, { kind: 'ai', text: resultado.texto ?? '[IA] Analise o campo e decida sua jogada.' }]);
+      }
+    });
   }
 
   function sendChat() {
