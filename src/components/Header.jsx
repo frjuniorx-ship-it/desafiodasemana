@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Header({ isBattle, onBack, breadcrumb }) {
+export default function Header({ isBattle, onBack, breadcrumb, user, onLoginClick, onPerfilClick }) {
   const [hoverBack, setHoverBack] = useState(false);
   const [hoveredHeader, setHoveredHeader] = useState(false);
   const collapsed = isBattle && !hoveredHeader;
@@ -59,24 +59,29 @@ export default function Header({ isBattle, onBack, breadcrumb }) {
       </div>
 
       {/* Badge jogador */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '6px 12px 6px 8px',
-        background: 'linear-gradient(180deg, #1a2e22, #0f1f17)',
-        border: '1px solid rgba(212,168,87,.35)', borderRadius: 24, flexShrink: 0,
-      }}>
-        <div style={{
-          width: 26, height: 26, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #d4a857, #8a5d1f)',
-          border: '1.5px solid #f5d27a',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, color: '#0b1612', fontSize: 11,
-        }}>A</div>
-        <div style={{ lineHeight: 1.1 }}>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, color: '#e8d5a8', letterSpacing: '.08em' }}>Aurélio</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#c89b3c', letterSpacing: '.05em' }}>nv. 14 · bandeirante</div>
+      {user ? (
+        <div
+          onClick={onPerfilClick}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 8px', background: 'linear-gradient(180deg, #1a2e22, #0f1f17)', border: '1px solid rgba(212,168,87,.35)', borderRadius: 24, flexShrink: 0, cursor: 'pointer' }}
+        >
+          <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #d4a857, #8a5d1f)', border: '1.5px solid #f5d27a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, color: '#0b1612', fontSize: 11, overflow: 'hidden', flexShrink: 0 }}>
+            {(user.user_display_name || user.user_email || '?')[0].toUpperCase()}
+          </div>
+          <div style={{ lineHeight: 1.1 }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, color: '#e8d5a8', letterSpacing: '.08em', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.user_display_name || user.user_email}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#c89b3c', letterSpacing: '.05em' }}>ver perfil</div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <button
+          onClick={onLoginClick}
+          style={{ flexShrink: 0, padding: '7px 18px', borderRadius: 20, background: 'radial-gradient(ellipse at 50% 0%, #f5d27a, #c89b3c 50%, #8a5d1f 95%)', border: '1.5px solid #f5d27a', color: '#0b1612', fontFamily: "'Cinzel', serif", fontWeight: 700, fontSize: 10, letterSpacing: '.18em', cursor: 'pointer', boxShadow: 'inset 0 -2px 4px rgba(0,0,0,.3)' }}
+        >
+          ENTRAR
+        </button>
+      )}
     </div>
     </header>
   );

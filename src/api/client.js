@@ -34,3 +34,17 @@ export function post(path, body, token) {
     body: JSON.stringify(body),
   });
 }
+
+export function bearerGet(path, token) {
+  return apiFetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}
+
+export function bearerPost(path, body, token) {
+  return apiFetch(path, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: JSON.stringify(body),
+  });
+}

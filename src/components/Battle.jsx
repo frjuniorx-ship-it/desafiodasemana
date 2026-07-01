@@ -8,7 +8,7 @@ import UtilSlot from './battle/UtilSlot';
 import NPCHandCard from './battle/NPCHandCard';
 import ChatBubble from './battle/ChatBubble';
 
-export default function Battle({ npc, onGameOver }) {
+export default function Battle({ npc, onGameOver, token }) {
   const npcName    = npc?.name    || 'Desconhecido';
   const npcInitial = npc?.initial || '?';
   const npcColor   = npc?.color   || '#8a5a9a';
@@ -72,7 +72,7 @@ export default function Battle({ npc, onGameOver }) {
 
   useEffect(() => {
     if (fimDeJogo === 'vitoria' && npc?._id) {
-      registrarResultado(npc._id, 'vitoria').catch(console.error);
+      registrarResultado(npc._id, 'vitoria', token).catch(console.error);
     }
   }, [fimDeJogo]);
 
