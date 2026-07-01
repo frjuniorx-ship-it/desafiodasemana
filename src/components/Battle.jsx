@@ -90,29 +90,22 @@ export default function Battle({ npc }) {
                 <span style={{ fontFamily: "'Cinzel', serif", fontStyle: 'italic', fontSize: 11, color: '#d4a857' }}>decidindo…</span>
               </div>
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#7a6a45', textAlign: 'right', letterSpacing: '.12em', flexShrink: 0 }}>
-              TURNO <span style={{ color: '#d4a857', fontSize: 14, fontWeight: 600 }}>07</span><br />
-              <span style={{ color: '#5a5040' }}>vez do oponente</span>
-            </div>
-          </div>
-
-          {/* Mão do NPC */}
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px', background: 'linear-gradient(180deg, rgba(38,20,28,.45), rgba(20,12,16,.35))', border: '1px solid rgba(200,77,42,.28)', borderRadius: 10 }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.22em', color: '#a85040', writingMode: 'vertical-rl', transform: 'rotate(180deg)', flexShrink: 0 }}>MÃO DO NPC · 5</div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 8, maxWidth: 480 }}>
+            {/* Mão do NPC integrada na barra */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
               {deckLoading
                 ? Array.from({ length: 5 }).map((_, i) => (
-                    <NPCHandCard key={i} card={{ name: '???' }} revealed={false} onZoom={zoomCard} />
+                    <div key={i} style={{ width: 34, height: 48, borderRadius: 4, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.2), transparent 65%), repeating-linear-gradient(45deg, #1a2e22 0 3px, #142418 3px 6px)', border: '1px solid rgba(200,155,60,.2)', flexShrink: 0 }} />
                   ))
                 : maoNpc.map((carta, i) => (
-                    <NPCHandCard key={i} card={carta} revealed={false} onZoom={zoomCard} />
+                    <div key={i} style={{ width: 34, flexShrink: 0 }}>
+                      <NPCHandCard card={carta} revealed={false} onZoom={zoomCard} />
+                    </div>
                   ))
               }
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: '#5a5040', letterSpacing: '.18em' }}>NA MÃO</div>
-              <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>{maoNpc.length}</div>
-              <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 9, color: '#7a6a45' }}>cartas</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#7a6a45', textAlign: 'right', letterSpacing: '.12em', flexShrink: 0 }}>
+              TURNO <span style={{ color: '#d4a857', fontSize: 14, fontWeight: 600 }}>07</span><br />
+              <span style={{ color: '#5a5040' }}>vez do oponente</span>
             </div>
           </div>
 
@@ -128,11 +121,41 @@ export default function Battle({ npc }) {
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
                 </div>
               </div>
+              {/* NPC Deck + Esquecimento */}
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{ position: 'relative', width: 32, height: 44 }}>
+                    <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#d4a857' }}>{deckNpc.length}</div>
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#7a6a45', letterSpacing: '.15em' }}>DECK</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22 }}>
+                    {esquecimentoNpc.length > 0 ? (esquecimentoNpc[esquecimentoNpc.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#7a6a45', letterSpacing: '.1em' }}>ESQ.</div>
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                 <div style={{ width: 1, height: 16, background: 'rgba(212,168,87,.3)' }} />
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#5a5040', letterSpacing: '.1em' }}>META 20</div>
                 <div style={{ width: 1, height: 16, background: 'rgba(212,168,87,.3)' }} />
+              </div>
+              {/* Player Deck + Esquecimento */}
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{ position: 'relative', width: 32, height: 44 }}>
+                    <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#d4a857' }}>20</div>
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#7a6a45', letterSpacing: '.15em' }}>DECK</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{ width: 32, height: 44, background: 'rgba(11,22,18,.5)', border: '1px solid #2a1e10', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: .22 }}>○</div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#7a6a45', letterSpacing: '.1em' }}>ESQ.</div>
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -148,29 +171,16 @@ export default function Battle({ npc }) {
 
             {/* Campo do NPC */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(80,20,30,.35), transparent 75%), linear-gradient(180deg, rgba(38,20,28,.5), rgba(20,12,16,.3))', border: '1px solid rgba(200,77,42,.3)', borderRadius: 12, padding: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px' }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#a85040' }}>▲ CAMPO DO {npcName.toUpperCase()}</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallSlot label="DECK" count={deckNpc.length} />
-                  <SmallSlot label="ESQUEC." faceUp={esquecimentoNpc.length > 0} cardName={esquecimentoNpc[esquecimentoNpc.length - 1]?.name} />
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 12%' }}>
+                  {campoNpc.plantas.map((carta, i) => (
+                    <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                  ))}
                 </div>
-              </div>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                  <UtilSlot kind="folc" count={campoNpc.folcloricas.length} side="npc" />
-                  <UtilSlot kind="acao" filled={!!campoNpc.acao} side="npc" />
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 8%' }}>
-                    {campoNpc.plantas.map((carta, i) => (
-                      <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
-                    ))}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                    {campoNpc.personagens.map((carta, i) => (
-                      <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
-                    ))}
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+                  {campoNpc.personagens.map((carta, i) => (
+                    <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                  ))}
                 </div>
               </div>
             </div>
@@ -184,30 +194,17 @@ export default function Battle({ npc }) {
 
             {/* Campo do jogador */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(26,46,34,.4), transparent 75%), linear-gradient(0deg, rgba(26,46,34,.55), rgba(15,31,23,.35))', border: '1px solid rgba(90,138,74,.4)', borderRadius: 12, padding: 10 }}>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8, alignItems: 'stretch' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                  <UtilSlot kind="folc" count={campoJogador.folcloricas.length} side="player" />
-                  <UtilSlot kind="acao" filled={!!campoJogador.acao} side="player" />
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+                  {campoJogador.personagens.map((carta, i) => (
+                    <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                  ))}
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                    {campoJogador.personagens.map((carta, i) => (
-                      <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} />
-                    ))}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 8%' }}>
-                    {campoJogador.plantas.map((carta, i) => (
-                      <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} />
-                    ))}
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, padding: '0 12%' }}>
+                  {campoJogador.plantas.map((carta, i) => (
+                    <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                  ))}
                 </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, padding: '0 4px' }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <SmallSlot label="DECK" count={20} />
-                  <SmallSlot label="ESQUEC." />
-                </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.3em', color: '#5a8a4a' }}>▼ SEU CAMPO</div>
               </div>
             </div>
             </div>{/* fecha board content */}
