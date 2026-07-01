@@ -30,6 +30,8 @@ function normalizeCardForSlot(entrada) {
     effect:     effectText,
     wp_id:      entrada.wp_id ?? null,
     nd:         entrada.nd ?? null,
+    mecanica:   toArray(entrada.mecanica ?? entrada.mecanicas ?? []),
+    classes:    toArray(entrada.classe   ?? entrada.classes   ?? []),
     entrou_turno_atual: false,
   };
 }
@@ -45,6 +47,32 @@ function expandirDeck(deckEntradas) {
     }
   }
   return cartas;
+}
+
+function toArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
+
+// Identifica o papel de jogo de uma carta normalizada
+function getCardType(c) {
+  const cat = (c.category || '').toLowerCase();
+  const mec = c.mecanica || [];
+  if (cat === 'planta') return 'planta';
+  if (cat.startsWith('folcl')) return 'folclorica';
+  if (cat === 'ação' || cat === 'acao') return 'acao_rapida';
+  if (cat === 'apoio') {
+    if (mec.includes('equipamento'))    return 'equipamento';
+    if (mec.includes('acao_instantanea')) return 'acao_rapida';
+    if (mec.includes('acao_continua') || mec.includes('acao_turno')) return 'acao_continua';
+    if (mec.includes('personagem'))     return 'personagem';
+    return 'apoio';
+  }
+  return 'personagem'; // Histórica, Fera, Personagem — default
+}
+
+// Equipamento pode ser usado num personagem se classes compatíveis (ou sem restrição)
+function podeEquipar(equip, personagem) {
+  const ce = equip.classes || [];
+  const cp = personagem.classes || [];
+  return ce.length === 0 || ce.some(c => cp.includes(c));
 }
 
 function categoriaParaZona(categoria) {
@@ -75,6 +103,7 @@ export function useBattleState(npc) {
   const [turno, setTurno]                 = useState(0);
   const [vezDoNpc, setVezDoNpc]           = useState(false);
   const [log, setLog]                     = useState([]);
+  const [fimDeJogo, setFimDeJogo]         = useState(null); // null | 'vitoria' | 'derrota'
 
   useEffect(() => {
     if (!npc?._id) return;
@@ -127,13 +156,23 @@ export function useBattleState(npc) {
     let workDeck  = [...deckNpc];
     let workCampo = {
       ...campoNpc,
-      personagens:  [...campoNpc.personagens],
-      plantas:      [...campoNpc.plantas],
-      folcloricas:  [...campoNpc.folcloricas],
+      personagens: [...campoNpc.personagens],
+      plantas:     [...campoNpc.plantas],
+      folcloricas: [...campoNpc.folcloricas],
     };
-    let workEsq  = [...esquecimentoNpc];
-    let workPcJ  = pcJogador;
+    let workEsq = [...esquecimentoNpc];
+    let workPcJ = pcJogador;
+    let workPcN = pcNpc;
     const nextTurno = turno + 1;
+
+    // Flags regra 20.0/20.1: máximo 1 de cada tipo por turno
+    const flags = { jogouPersonagem: false, jogouFolclorica: false, jogouAcao: false, jogouEquipamento: false, jogouPlanta: false };
+
+    const checkFimDeJogo = (pcJ, pcN) => {
+      if (pcJ <= 0) { addLog('[FIM] Você foi derrotado. O NPC venceu.', '#c84d2a'); setFimDeJogo('derrota'); return true; }
+      if (pcN <= 0) { addLog('[FIM] Você venceu!', '#8ac46a'); setFimDeJogo('vitoria'); return true; }
+      return false;
+    };
 
     setVezDoNpc(true);
     setTurno(nextTurno);
@@ -148,40 +187,83 @@ export function useBattleState(npc) {
     if (compradas.length > 0)
       addLog(`[NPC] Comprou ${compradas.length} carta${compradas.length !== 1 ? 's' : ''}`, '#a89870');
 
-    // 2. Jogar personagem
+    // 2. Jogar personagem (Histórica, Fera, ou Apoio+mecanica:personagem)
     await delay(800);
-    {
-      const mi = workMao.findIndex(c => categoriaParaZona(c.category) === 'personagens');
+    if (!flags.jogouPersonagem) {
+      const mi = workMao.findIndex(c => getCardType(c) === 'personagem');
       const si = workCampo.personagens.indexOf(null);
       if (mi !== -1 && si !== -1) {
         const carta = { ...workMao[mi], entrou_turno_atual: true };
         workMao.splice(mi, 1);
         workCampo.personagens[si] = carta;
+        flags.jogouPersonagem = true;
         setMaoNpc([...workMao]);
         setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
         addLog(`[NPC] Jogou ${carta.name} em campo`, '#c84d2a');
       }
     }
 
-    // 3. Jogar planta
+    // 3. Equipar (Apoio+mecanica:equipamento em personagem em campo com classe compatível)
     await delay(800);
-    {
-      const mi = workMao.findIndex(c => categoriaParaZona(c.category) === 'plantas');
+    if (!flags.jogouEquipamento) {
+      const mi = workMao.findIndex(c => getCardType(c) === 'equipamento');
+      if (mi !== -1) {
+        const equip = workMao[mi];
+        const pi = workCampo.personagens.findIndex(c => c && podeEquipar(equip, c));
+        if (pi !== -1) {
+          const alvo = workCampo.personagens[pi];
+          workCampo.personagens[pi] = { ...alvo, pc: (alvo.pc || 0) + (equip.pc || 0) };
+          workMao.splice(mi, 1);
+          flags.jogouEquipamento = true;
+          setMaoNpc([...workMao]);
+          setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
+          addLog(`[NPC] Equipou ${equip.name} em ${alvo.name}`, '#d4a857');
+        }
+      }
+    }
+
+    // 4. Jogar ação (acao_rapida → esquecimento; acao_continua → slot de ação)
+    await delay(800);
+    if (!flags.jogouAcao) {
+      const mi = workMao.findIndex(c => { const t = getCardType(c); return t === 'acao_rapida' || t === 'acao_continua'; });
+      if (mi !== -1) {
+        const carta = workMao[mi];
+        const tipo = getCardType(carta);
+        workMao.splice(mi, 1);
+        flags.jogouAcao = true;
+        if (tipo === 'acao_continua') {
+          workCampo.acao = carta;
+          setCampoNpc({ ...workCampo });
+          addLog(`[NPC] Jogou ação ${carta.name}`, '#a8c8e8');
+        } else {
+          workEsq = [...workEsq, carta];
+          setEsquecimentoNpc([...workEsq]);
+          addLog(`[NPC] Ativou ação rápida ${carta.name}`, '#a8c8e8');
+        }
+        setMaoNpc([...workMao]);
+      }
+    }
+
+    // 5. Jogar planta
+    await delay(800);
+    if (!flags.jogouPlanta) {
+      const mi = workMao.findIndex(c => getCardType(c) === 'planta');
       const si = workCampo.plantas.indexOf(null);
       if (mi !== -1 && si !== -1) {
         const carta = workMao[mi];
         workMao.splice(mi, 1);
         workCampo.plantas[si] = carta;
+        flags.jogouPlanta = true;
         setMaoNpc([...workMao]);
         setCampoNpc({ ...workCampo, plantas: [...workCampo.plantas] });
         addLog(`[NPC] Jogou planta ${carta.name}`, '#8ac46a');
       }
     }
 
-    // 4. Jogar folclórica (se tiver ND cartas para pagar)
+    // 6. Jogar folclórica (nd cartas descartadas da mão, excluindo a própria)
     await delay(800);
-    {
-      const mi = workMao.findIndex(c => categoriaParaZona(c.category) === 'folcloricas');
+    if (!flags.jogouFolclorica) {
+      const mi = workMao.findIndex(c => getCardType(c) === 'folclorica');
       if (mi !== -1) {
         const folc = workMao[mi];
         const nd = folc.nd ?? 0;
@@ -195,6 +277,7 @@ export function useBattleState(npc) {
           workEsq = [...workEsq, ...descartar];
           workMao = workMao.filter((_, i) => !descIdxs.has(i));
           workCampo.folcloricas = [...workCampo.folcloricas, folc];
+          flags.jogouFolclorica = true;
           setMaoNpc([...workMao]);
           setEsquecimentoNpc([...workEsq]);
           setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
@@ -203,7 +286,7 @@ export function useBattleState(npc) {
       }
     }
 
-    // 5. Atacar ou ataque direto
+    // 7. Atacar (regra 21.0: só personagens com entrou_turno_atual: false)
     await delay(800);
     {
       const atacantes = workCampo.personagens.filter(c => c && !c.entrou_turno_atual);
@@ -217,17 +300,18 @@ export function useBattleState(npc) {
           workPcJ = Math.max(0, workPcJ - dano);
           setPcJogador(workPcJ);
           addLog(`[COMBATE] Ataque direto! ${atk.name} causou ${dano} de dano`, '#c84d2a');
+          if (checkFimDeJogo(workPcJ, workPcN)) return;
         }
       }
     }
 
-    // 6. Passar vez — resetar entrou_turno_atual de todas as cartas NPC
+    // 8. Passar vez — resetar entrou_turno_atual
     await delay(800);
     workCampo.personagens = workCampo.personagens.map(c => c ? { ...c, entrou_turno_atual: false } : null);
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
-  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, turno]);
+  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
 
   const jogadorJogarCarta = useCallback(async (nome) => {
     const carta = await getCartaByNome(nome);
@@ -263,7 +347,7 @@ export function useBattleState(npc) {
     loading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
-    turno, vezDoNpc, log,
+    turno, vezDoNpc, log, fimDeJogo,
     npcJogarCarta, jogadorJogarCarta,
     passarVez: npcExecutarTurno,
   };

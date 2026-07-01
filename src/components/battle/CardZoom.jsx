@@ -32,7 +32,7 @@ export default function CardZoom({ card }) {
   const cardName = card.name || card.nome || '';
   const initial = (cardName[0] || '?').toUpperCase();
   const stars = '★'.repeat(rarity);
-  const imgUrl = card.imagem_url || card.imagemUrl || '';
+  const imgUrl = card.imagem_url || '';
   const atk = card.atk ?? card.ataque ?? null;
   const def = card.def ?? card.defesa ?? null;
 
@@ -60,7 +60,7 @@ export default function CardZoom({ card }) {
             <div style={{ marginTop: 8, aspectRatio: '5/7', borderRadius: 4, border: '1px solid rgba(212,168,87,.3)', position: 'relative', overflow: 'hidden', background: `repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px), radial-gradient(ellipse at 50% 30%, ${cm.c1}88, ${cm.c2} 70%, #0b1612)` }}>
               {imgUrl
                 ? <img src={imgUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} />
-                : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 56, color: cm.c1, opacity: .7, textShadow: '0 2px 12px rgba(0,0,0,.7)' }}>{initial}</div>
+                : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel', serif", fontStyle: 'italic', fontSize: 11, color: cm.c1, opacity: .5, textAlign: 'center', padding: 8 }}>Carta não encontrada</div>
               }
               <div style={{ position: 'absolute', bottom: 5, left: 6, display: 'flex', gap: 2 }}><span style={{ color: '#f5d27a', fontSize: 10, textShadow: '0 0 3px rgba(0,0,0,.8)' }}>{stars}</span></div>
               {card.cost != null && <div style={{ position: 'absolute', top: 5, left: 6, width: 24, height: 24, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a, #6b4a16)', border: '1.5px solid #f5d27a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 12, color: '#0b1612', boxShadow: '0 0 6px rgba(0,0,0,.5)' }}>{card.cost}</div>}

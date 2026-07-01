@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { initialChat } from '../data';
+import { registrarResultado } from '../api/progresso.js';
 import { useBattleState } from '../hooks/useBattleState.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -9,7 +9,7 @@ import NPCHandCard from './battle/NPCHandCard';
 import CardZoom from './battle/CardZoom';
 import ChatBubble from './battle/ChatBubble';
 
-export default function Battle({ npc }) {
+export default function Battle({ npc, onGameOver }) {
   const npcName    = npc?.name    || 'Desconhecido';
   const npcInitial = npc?.initial || '?';
   const npcColor   = npc?.color   || '#8a5a9a';
@@ -20,12 +20,12 @@ export default function Battle({ npc }) {
     loading: deckLoading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
-    turno, vezDoNpc, log, passarVez,
+    turno, vezDoNpc, log, fimDeJogo, passarVez,
     jogadorJogarCarta,
   } = useBattleState(npc);
 
   const [zoomedCard, setZoomedCard] = useState(null);
-  const [chat, setChat] = useState(initialChat);
+  const [chat, setChat] = useState([]);
   const [inputVal, setInputVal] = useState('');
   const chatRef = useRef(null);
 
@@ -61,6 +61,12 @@ export default function Battle({ npc }) {
       setChat(prev => [...prev, { kind: 'ai', text: 'Boa jogada. Observe a posição do oponente antes de confirmar.' }]);
     }, 1200);
   }
+
+  useEffect(() => {
+    if (fimDeJogo === 'vitoria' && npc?._id) {
+      registrarResultado(npc._id, 'vitoria').catch(console.error);
+    }
+  }, [fimDeJogo]);
 
   return (
     <main style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '8px 14px 0', boxSizing: 'border-box' }}>
@@ -280,6 +286,36 @@ export default function Battle({ npc }) {
         </aside>
 
       </div>
+      {fimDeJogo && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'linear-gradient(180deg, #1a2e22, #0b1612)', border: `2px solid ${fimDeJogo === 'vitoria' ? '#c89b3c' : '#c84d2a'}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 360, boxShadow: `0 0 60px ${fimDeJogo === 'vitoria' ? 'rgba(200,155,60,.4)' : 'rgba(200,77,42,.4)'}` }}>
+            <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 48, color: fimDeJogo === 'vitoria' ? '#f5d27a' : '#c84d2a', letterSpacing: '.06em', textShadow: `0 0 24px ${fimDeJogo === 'vitoria' ? 'rgba(245,210,122,.5)' : 'rgba(200,77,42,.5)'}` }}>
+              {fimDeJogo === 'vitoria' ? 'VITÓRIA' : 'DERROTA'}
+            </div>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 16, color: '#a89870', marginTop: 8, letterSpacing: '.1em' }}>{npcName}</div>
+            {fimDeJogo === 'vitoria' && npc?.recompensa_tipo && (
+              <div style={{ marginTop: 20, padding: '14px 20px', background: 'rgba(200,155,60,.1)', border: '1px solid rgba(212,168,87,.3)', borderRadius: 8 }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7a6a45', letterSpacing: '.2em', marginBottom: 6 }}>RECOMPENSA</div>
+                {npc.recompensa_tipo === 'titulo' && (
+                  <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: '#e8d5a8' }}>Você conquistou o título: <strong>{npc.recompensa_valor}</strong></div>
+                )}
+                {npc.recompensa_tipo === 'cupom_woocommerce' && (
+                  <div style={{ fontFamily: "'Lora', serif", fontSize: 13, color: '#e8d5a8' }}>Seu cupom de desconto foi enviado para o seu e-mail.</div>
+                )}
+                {npc.recompensa_tipo === 'texto_livre' && (
+                  <div style={{ fontFamily: "'Lora', serif", fontSize: 13, color: '#e8d5a8' }}>{npc.recompensa_valor}</div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => onGameOver?.(fimDeJogo)}
+              style={{ marginTop: 28, padding: '12px 28px', borderRadius: 8, background: 'radial-gradient(ellipse at 50% 0%, #f5d27a, #c89b3c 50%, #8a5d1f 95%)', border: '1.5px solid #f5d27a', color: '#0b1612', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, letterSpacing: '.14em', cursor: 'pointer' }}
+            >
+              VOLTAR AOS DESAFIOS
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
