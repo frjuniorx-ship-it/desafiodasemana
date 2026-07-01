@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getDesafioById } from '../api/desafios.js';
 import { getCartaByNome } from '../api/cartas.js';
+import {
+  isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
+  isFolclorica, isPlanta, podeAtacar,
+  SLOTS, LIMITE_TURNO, PC_INICIAL,
+} from '../engine/rules.js';
 
 function shuffle(arr) {
   const a = [...arr];
@@ -20,9 +25,11 @@ function normalizeCardForSlot(entrada) {
     ? efeitos.map(e => e.display_name ?? e.name ?? '').filter(Boolean).join(' · ')
     : '';
 
+  const category = entrada.categoria ?? entrada.tipo ?? entrada.category ?? 'Personagem';
   return {
     name:       entrada.nome      ?? entrada.name      ?? '',
-    category:   entrada.categoria ?? entrada.tipo      ?? entrada.category ?? 'Personagem',
+    category,
+    tipo:       category, // alias para compatibilidade com rules.js
     atk:        entrada.atq       ?? entrada.ataque    ?? entrada.atk      ?? 0,
     def:        entrada.def       ?? entrada.defesa    ?? 0,
     pc:         entrada.pc        ?? entrada.pontos_conhecimento ?? 0,
@@ -51,23 +58,6 @@ function expandirDeck(deckEntradas) {
 
 function toArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
 
-// Identifica o papel de jogo de uma carta normalizada
-function getCardType(c) {
-  const cat = (c.category || '').toLowerCase();
-  const mec = c.mecanica || [];
-  if (cat === 'planta') return 'planta';
-  if (cat.startsWith('folcl')) return 'folclorica';
-  if (cat === 'ação' || cat === 'acao') return 'acao_rapida';
-  if (cat === 'apoio') {
-    if (mec.includes('equipamento'))    return 'equipamento';
-    if (mec.includes('acao_instantanea')) return 'acao_rapida';
-    if (mec.includes('acao_continua') || mec.includes('acao_turno')) return 'acao_continua';
-    if (mec.includes('personagem'))     return 'personagem';
-    return 'apoio';
-  }
-  return 'personagem'; // Histórica, Fera, Personagem — default
-}
-
 // Equipamento pode ser usado num personagem se classes compatíveis (ou sem restrição)
 function podeEquipar(equip, personagem) {
   const ce = equip.classes || [];
@@ -85,8 +75,8 @@ function categoriaParaZona(categoria) {
 }
 
 const campoPadrao = () => ({
-  personagens: [null, null, null, null, null],
-  plantas: [null, null, null],
+  personagens: Array(SLOTS.personagens).fill(null),
+  plantas:     Array(SLOTS.plantas).fill(null),
   folcloricas: [],
   acao: null,
 });
@@ -97,9 +87,9 @@ export function useBattleState(npc) {
   const [maoNpc, setMaoNpc]               = useState([]);
   const [campoNpc, setCampoNpc]           = useState(campoPadrao);
   const [esquecimentoNpc, setEsquecimentoNpc] = useState([]);
-  const [pcNpc, setPcNpc]                 = useState(20);
+  const [pcNpc, setPcNpc]                 = useState(PC_INICIAL);
   const [campoJogador, setCampoJogador]   = useState(campoPadrao);
-  const [pcJogador, setPcJogador]         = useState(20);
+  const [pcJogador, setPcJogador]         = useState(PC_INICIAL);
   const [turno, setTurno]                 = useState(0);
   const [vezDoNpc, setVezDoNpc]           = useState(false);
   const [log, setLog]                     = useState([]);
@@ -190,7 +180,7 @@ export function useBattleState(npc) {
     // 2. Jogar personagem (Histórica, Fera, ou Apoio+mecanica:personagem)
     await delay(800);
     if (!flags.jogouPersonagem) {
-      const mi = workMao.findIndex(c => getCardType(c) === 'personagem');
+      const mi = workMao.findIndex(c => isPersonagem(c));
       const si = workCampo.personagens.indexOf(null);
       if (mi !== -1 && si !== -1) {
         const carta = { ...workMao[mi], entrou_turno_atual: true };
@@ -206,7 +196,7 @@ export function useBattleState(npc) {
     // 3. Equipar (Apoio+mecanica:equipamento em personagem em campo com classe compatível)
     await delay(800);
     if (!flags.jogouEquipamento) {
-      const mi = workMao.findIndex(c => getCardType(c) === 'equipamento');
+      const mi = workMao.findIndex(c => isEquipamento(c));
       if (mi !== -1) {
         const equip = workMao[mi];
         const pi = workCampo.personagens.findIndex(c => c && podeEquipar(equip, c));
@@ -225,13 +215,12 @@ export function useBattleState(npc) {
     // 4. Jogar ação (acao_rapida → esquecimento; acao_continua → slot de ação)
     await delay(800);
     if (!flags.jogouAcao) {
-      const mi = workMao.findIndex(c => { const t = getCardType(c); return t === 'acao_rapida' || t === 'acao_continua'; });
+      const mi = workMao.findIndex(c => isAcaoRapida(c) || isAcaoContinua(c));
       if (mi !== -1) {
         const carta = workMao[mi];
-        const tipo = getCardType(carta);
         workMao.splice(mi, 1);
         flags.jogouAcao = true;
-        if (tipo === 'acao_continua') {
+        if (isAcaoContinua(carta)) {
           workCampo.acao = carta;
           setCampoNpc({ ...workCampo });
           addLog(`[NPC] Jogou ação ${carta.name}`, '#a8c8e8');
@@ -247,7 +236,7 @@ export function useBattleState(npc) {
     // 5. Jogar planta
     await delay(800);
     if (!flags.jogouPlanta) {
-      const mi = workMao.findIndex(c => getCardType(c) === 'planta');
+      const mi = workMao.findIndex(c => isPlanta(c));
       const si = workCampo.plantas.indexOf(null);
       if (mi !== -1 && si !== -1) {
         const carta = workMao[mi];
@@ -263,7 +252,7 @@ export function useBattleState(npc) {
     // 6. Jogar folclórica (nd cartas descartadas da mão, excluindo a própria)
     await delay(800);
     if (!flags.jogouFolclorica) {
-      const mi = workMao.findIndex(c => getCardType(c) === 'folclorica');
+      const mi = workMao.findIndex(c => isFolclorica(c));
       if (mi !== -1) {
         const folc = workMao[mi];
         const nd = folc.nd ?? 0;
@@ -289,7 +278,7 @@ export function useBattleState(npc) {
     // 7. Atacar (regra 21.0: só personagens com entrou_turno_atual: false)
     await delay(800);
     {
-      const atacantes = workCampo.personagens.filter(c => c && !c.entrou_turno_atual);
+      const atacantes = workCampo.personagens.filter(c => c && podeAtacar(c));
       const alvos = campoJogador.personagens.filter(Boolean);
       for (const atk of atacantes) {
         await delay(800);
