@@ -20,6 +20,8 @@ function normalizeNpc(apiNpc, state, date) {
     imagem_url: apiNpc.imagem_url || '',
     state,
     date,
+    recompensa_tipo: apiNpc.recompensa_tipo,
+    recompensa_valor: apiNpc.recompensa_valor,
   };
 }
 
@@ -31,7 +33,10 @@ export default function Gallery({ onPlay }) {
 
   useEffect(() => {
     fetchDesafios()
-      .then(setApiNpcs)
+      .then(data => {
+        console.log('[API] desafios retornou:', data);
+        setApiNpcs(data);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
 
@@ -89,7 +94,12 @@ export default function Gallery({ onPlay }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
           <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle, #f5d27a, #8a5d1f)', border: '1px solid #c89b3c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>★</div>
           <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 12, color: '#a89870' }}>
-            Próxima recompensa: <span style={{ color: '#d4a857', fontStyle: 'normal', fontWeight: 600 }}>Carta Lendária — "Curupira dos Pinheirais"</span> ao vencer 5 NPCs
+            {(() => {
+            const next = npcs.find(n => n.state === 'available');
+            return next?.recompensa_valor
+              ? <>Próxima recompensa: <span style={{ color: '#d4a857', fontStyle: 'normal', fontWeight: 600 }}>{next.recompensa_valor}</span></>
+              : 'Nenhuma recompensa ativa no momento';
+          })()}
           </div>
         </div>
       </div>

@@ -24,31 +24,10 @@ export default function Header({ isBattle, onBack, breadcrumb }) {
       display: 'flex', alignItems: 'center', gap: 14,
     }}>
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div style={{
-          width: 42, height: 42, position: 'relative',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'radial-gradient(circle at 50% 50%, #1f3326, #0d1b13 70%)',
-          border: '1.5px solid #c89b3c', borderRadius: '50% 50% 50% 8%',
-          boxShadow: '0 0 16px rgba(200,155,60,.4), inset 0 0 10px rgba(0,0,0,.6)',
-          transform: 'rotate(-8deg)',
-        }}>
-          <div style={{
-            width: 18, height: 9, borderRadius: '50%',
-            background: 'radial-gradient(ellipse at center, #f5d27a 0%, #c89b3c 45%, #6b4a16 90%)',
-            position: 'relative',
-          }}>
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%',
-              transform: 'translate(-50%,-50%)',
-              width: 5, height: 5, background: '#0b1612', borderRadius: '50%',
-            }} />
-          </div>
-        </div>
-        <div style={{ lineHeight: 1 }}>
-          <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 13, letterSpacing: '.18em', color: '#d4a857', textShadow: '0 1px 0 rgba(0,0,0,.6)' }}>LENDAS</div>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, letterSpacing: '.32em', color: '#8a7a52', marginTop: 3 }}>&amp; BATALHAS</div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <a href="https://lendasebatalhas.com.br" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center' }}>
+          <img src="https://lendasebatalhas.com.br/wp-content/uploads/2021/01/logo_horizontal.png" alt="Lendas &amp; Batalhas" height="40" style={{ width: 'auto', display: 'block' }} />
+        </a>
       </div>
 
       {/* Nav */}

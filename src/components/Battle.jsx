@@ -49,10 +49,11 @@ export default function Battle({ npc, onGameOver }) {
     setInputVal('');
     setChat(prev => [...prev, { kind: 'player', text }]);
 
-    const matchJogar = /jogu[eo]i\s+(.+)/i.exec(text);
+    const matchJogar = /(jogu(ei|ar)|jogo|baixei|coloquei|desci)\s+(.+)/i.exec(text);
     if (matchJogar) {
-      const nomeCarta = matchJogar[1].trim();
+      const nomeCarta = matchJogar[3].trim();
       jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
+        console.log('[DEBUG campoJogador]', campoJogador);
         if (carta) {
           setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
         } else if (sugestao) {

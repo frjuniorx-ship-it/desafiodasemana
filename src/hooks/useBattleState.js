@@ -111,6 +111,7 @@ export function useBattleState(npc) {
   const [fimDeJogo, setFimDeJogo]         = useState(null); // null | 'vitoria' | 'derrota'
   const [prontoParaJogar, setProntoParaJogar] = useState(false);
   const npcComecouRef = useRef(false);
+  const npcAutoStartRef = useRef(false);
 
   useEffect(() => {
     if (!npc?._id) return;
@@ -119,12 +120,21 @@ export function useBattleState(npc) {
       .then(data => {
         const todasCartas = expandirDeck(data.deck ?? []);
         const embaralhado = shuffle(todasCartas);
-        setMaoNpc(embaralhado.slice(0, 5));
-        setDeckNpc(embaralhado.slice(5));
+        // NPC começa com mão vazia — cartas distribuídas em iniciarJogo()
+        setMaoNpc([]);
+        setDeckNpc(embaralhado);
       })
       .catch(e => console.error('[useBattleState] erro ao carregar deck:', e.message))
       .finally(() => setLoading(false));
   }, [npc?._id]);
+
+  // Dispara o primeiro turno do NPC após o estado da mão ser atualizado por iniciarJogo
+  useEffect(() => {
+    if (prontoParaJogar && npcComecouRef.current && !npcAutoStartRef.current) {
+      npcAutoStartRef.current = true;
+      npcExecutarTurno();
+    }
+  }, [prontoParaJogar, npcExecutarTurno]);
 
   const npcJogarCarta = useCallback((carta, zona) => {
     setCampoNpc(prev => {
@@ -354,9 +364,13 @@ export function useBattleState(npc) {
 
   const iniciarJogo = useCallback((npcPrimeiro) => {
     npcComecouRef.current = npcPrimeiro;
+    const mao5 = deckNpc.slice(0, 5);
+    const resto = deckNpc.slice(5);
+    setMaoNpc(mao5);
+    setDeckNpc(resto);
     setProntoParaJogar(true);
-    if (npcPrimeiro) npcExecutarTurno();
-  }, [npcExecutarTurno]);
+    // NPC auto-start handled by useEffect watching [prontoParaJogar, npcExecutarTurno]
+  }, [deckNpc]);
 
   return {
     loading,

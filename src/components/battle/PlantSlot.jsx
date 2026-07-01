@@ -13,7 +13,6 @@ export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
         background: filled
           ? (side === 'npc' ? 'linear-gradient(180deg, #1f2e1a, #131e10)' : 'linear-gradient(180deg, #1a281a, #0f1a10)')
           : 'rgba(11,22,18,.4)',
-        display: 'flex', flexDirection: 'column',
         boxShadow: 'inset 0 1px 2px rgba(0,0,0,.3)',
         cursor: filled && !oculta ? 'pointer' : 'default',
         transition: 'filter .15s', position: 'relative',
@@ -24,14 +23,12 @@ export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
       {filled ? (
         oculta ? (
           /* Verso da carta (face oculta) */
-          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(138,196,106,.25), transparent 65%), repeating-linear-gradient(45deg, #1a2e22 0 4px, #142418 4px 8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: '34%', aspectRatio: '1', borderRadius: '50% 50% 50% 8%', border: '1.5px solid #5a8a4a', transform: 'rotate(-8deg)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 8px rgba(90,138,74,.4)' }}>
-              <div style={{ width: '60%', height: '60%', borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #8ac46a, #3a6a2a)' }} />
-            </div>
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+            <img src="https://lendasebatalhas.com.br/wp-content/uploads/2021/02/cardback.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
         ) : (
           <>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
               {card.imagem_url
                 ? <img src={card.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} />
                 : (
@@ -43,14 +40,14 @@ export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
                 )
               }
             </div>
-            <div style={{ flexShrink: 0, padding: '1px 3px', background: 'rgba(0,0,0,.45)', textAlign: 'center' }}>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '2px 3px', background: 'rgba(0,0,0,.55)', textAlign: 'center' }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, letterSpacing: '.15em', color: '#5a8a4a' }}>PLANTA</div>
               <div style={{ fontFamily: "'Cinzel', serif", fontSize: 8, color: '#c8e8a8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
             </div>
           </>
         )
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.15em', color: '#5a5040', opacity: .6 }}>+ PLANTA</div>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.15em', color: '#5a5040', opacity: .6 }}>+ PLANTA</div>
       )}
     </div>
   );

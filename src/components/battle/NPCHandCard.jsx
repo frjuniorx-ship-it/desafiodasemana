@@ -9,12 +9,8 @@ export default function NPCHandCard({ card, revealed, onZoom }) {
     >
       <div style={{ position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)', transition: 'transform .6s cubic-bezier(.4,.2,.2,1)' }}>
         {/* Verso */}
-        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 5, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.32), transparent 65%), repeating-linear-gradient(45deg, #1a2e22 0 4px, #142418 4px 8px)', border: '1.5px solid #c89b3c', boxShadow: '0 3px 8px rgba(0,0,0,.6), inset 0 0 12px rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '34%', aspectRatio: '1', borderRadius: '50% 50% 50% 8%', border: '1.5px solid #c89b3c', transform: 'rotate(-8deg)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(200,155,60,.5), inset 0 0 6px rgba(0,0,0,.4)' }}>
-            <div style={{ width: '55%', height: '30%', borderRadius: '50%', background: 'radial-gradient(ellipse, #f5d27a, #8a5d1f)', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '30%', height: '60%', background: '#0b1612', borderRadius: '50%' }} />
-            </div>
-          </div>
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 5, overflow: 'hidden' }}>
+          <img src="https://lendasebatalhas.com.br/wp-content/uploads/2021/02/cardback.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         {/* Frente (revelada) */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', borderRadius: 5, padding: 4, background: 'linear-gradient(180deg, #3a1e12 0%, #1a1010 100%)', border: '1.5px solid #c84d2a', boxShadow: '0 0 14px rgba(200,77,42,.4), 0 3px 8px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column' }}>

@@ -28,7 +28,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
       style={{
         position: 'relative', aspectRatio: '5/7', width: '100%', borderRadius: 6,
         border, background, boxShadow,
-        display: 'flex', flexDirection: 'column', padding: 5, overflow: 'hidden',
+        overflow: 'hidden',
         cursor: filled ? 'pointer' : 'default',
         transition: 'transform .15s, filter .15s',
       }}
@@ -37,7 +37,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
     >
       {filled ? (
         <>
-          <div style={{ flex: 1, borderRadius: 4, position: 'relative', overflow: 'hidden', background: `repeating-linear-gradient(125deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px), radial-gradient(ellipse at 50% 35%, ${portraitLight}, ${portraitDark} 70%, #0b1612)` }}>
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: `repeating-linear-gradient(125deg, rgba(0,0,0,.18) 0 2px, transparent 2px 7px), radial-gradient(ellipse at 50% 35%, ${portraitLight}, ${portraitDark} 70%, #0b1612)` }}>
             {card.imagem_url && (
               <img src={card.imagem_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', opacity: .9 }} />
             )}
@@ -46,10 +46,10 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
             {!card.imagem_url && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 26, color: accentColor, opacity: .55, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{initial}</div>}
             {attacking && <div style={{ position: 'absolute', inset: 0, boxShadow: 'inset 0 0 0 2px #c84d2a, inset 0 0 14px rgba(200,77,42,.5)', borderRadius: 4 }} />}
           </div>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, lineHeight: 1.1, color: '#e8d5a8', textAlign: 'center', marginTop: 4, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,.65)', fontFamily: "'Cinzel', serif", fontSize: 9, lineHeight: 1.2, color: '#e8d5a8', textAlign: 'center', padding: '2px 4px', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
         </>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: .35 }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: .35 }}>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: '.15em', color: '#7a6a45' }}>PERSONAGEM</div>
         </div>
       )}
