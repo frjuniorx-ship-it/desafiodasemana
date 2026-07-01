@@ -5,6 +5,7 @@ import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
   isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea,
   podeSer_Jogada_Folclorica, resolverCombate, pcPerdidoPorDestruicao,
+  podeSerDescartada, calcularFuria, temKeyword, KEYWORDS,
   SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
 } from '../engine/rules.js';
 
@@ -58,8 +59,9 @@ function normalizeCardForSlot(entrada) {
     effect:     effectText,
     wp_id:      entrada.wp_id ?? null,
     nd:         entrada.nd ?? null,
-    mecanica:   toArray(entrada.mecanica ?? entrada.mecanicas ?? []),
-    classes:    toArray(entrada.classe   ?? entrada.classes   ?? []),
+    mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
+    classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
+    effect_blocks: toArray(entrada.effect_blocks ?? []),
     entrou_turno_atual: false,
     equipamentos: [],
   };
@@ -201,13 +203,18 @@ export function useBattleState(npc) {
     if (compradas.length > 0)
       addLog(`[NPC] Comprou ${compradas.length} carta${compradas.length !== 1 ? 's' : ''}`, '#a89870');
 
-    // 2. Jogar personagem (Histórica, Fera, ou Apoio+mecanica:personagem)
+    // 2. Jogar personagem — heurística: maior ATK se oponente tem campo, maior DEF se vazio
     await delay(800);
     if (!flags.jogouPersonagem) {
-      const mi = workMao.findIndex(c => isPersonagem(c));
+      const candidatos = workMao.filter(c => isPersonagem(c));
       const si = workCampo.personagens.indexOf(null);
-      if (mi !== -1 && si !== -1) {
-        const carta = { ...workMao[mi], entrou_turno_atual: true };
+      if (candidatos.length > 0 && si !== -1) {
+        const adversarioTemCampo = campoJogador.personagens.some(Boolean);
+        const melhor = adversarioTemCampo
+          ? candidatos.slice().sort((a, b) => (b.atk ?? 0) - (a.atk ?? 0))[0]
+          : candidatos.slice().sort((a, b) => (b.def ?? 0) - (a.def ?? 0))[0];
+        const carta = { ...melhor, entrou_turno_atual: true };
+        const mi = workMao.findIndex(c => c === melhor);
         workMao.splice(mi, 1);
         workCampo.personagens[si] = carta;
         flags.jogouPersonagem = true;
@@ -257,7 +264,31 @@ export function useBattleState(npc) {
       }
     }
 
-    // 5. Jogar planta — entra oculta exceto instantâneas (regra 35.0)
+    // 5. Jogar folclórica — usa podeSerDescartada para selecionar fodder válido
+    await delay(800);
+    if (!flags.jogouFolclorica) {
+      const mi = workMao.findIndex(c => podeSer_Jogada_Folclorica(c, workMao));
+      if (mi !== -1) {
+        const folc = workMao[mi];
+        const nd = folc.nd ?? folc.numero_descarte ?? 0;
+        const descIdxs = new Set([mi]);
+        let cnt = 0;
+        for (let i = 0; i < workMao.length && cnt < nd; i++) {
+          if (i !== mi && podeSerDescartada(workMao[i])) { descIdxs.add(i); cnt++; }
+        }
+        const descartar = workMao.filter((_, i) => descIdxs.has(i) && i !== mi);
+        workEsq = [...workEsq, ...descartar];
+        workMao = workMao.filter((_, i) => !descIdxs.has(i));
+        workCampo.folcloricas = [...workCampo.folcloricas, folc];
+        flags.jogouFolclorica = true;
+        setMaoNpc([...workMao]);
+        setEsquecimentoNpc([...workEsq]);
+        setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
+        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''}`, '#e8a890');
+      }
+    }
+
+    // 6. Jogar planta — entra oculta exceto instantâneas (regra 35.0)
     await delay(800);
     if (!flags.jogouPlanta) {
       const mi = workMao.findIndex(c => isPlanta(c));
@@ -275,45 +306,33 @@ export function useBattleState(npc) {
       }
     }
 
-    // 6. Jogar folclórica (nd cartas descartadas da mão, excluindo a própria)
-    await delay(800);
-    if (!flags.jogouFolclorica) {
-      const mi = workMao.findIndex(c => podeSer_Jogada_Folclorica(c, workMao));
-      if (mi !== -1) {
-        const folc = workMao[mi];
-        const nd = folc.nd ?? folc.numero_descarte ?? 0;
-        const descIdxs = new Set([mi]);
-        let cnt = 0;
-        for (let i = 0; i < workMao.length && cnt < nd; i++) {
-          if (i !== mi) { descIdxs.add(i); cnt++; }
-        }
-        const descartar = workMao.filter((_, i) => descIdxs.has(i) && i !== mi);
-        workEsq = [...workEsq, ...descartar];
-        workMao = workMao.filter((_, i) => !descIdxs.has(i));
-        workCampo.folcloricas = [...workCampo.folcloricas, folc];
-        flags.jogouFolclorica = true;
-        setMaoNpc([...workMao]);
-        setEsquecimentoNpc([...workEsq]);
-        setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
-        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''}`, '#e8a890');
-      }
-    }
-
-    // 7. Atacar (regra 21.0: só personagens com entrou_turno_atual: false)
+    // 7. Atacar — calcularFuria, evitar VENENO_MORTAL, respeitar ATRAIR, preferir menor DEF
     await delay(800);
     {
       const atacantes = workCampo.personagens.filter(c => c && podeAtacar(c));
-      const alvos = campoJogador.personagens.filter(Boolean);
+      const totalEmCampo = workCampo.personagens.filter(Boolean).length;
+      const alvosJogador = campoJogador.personagens.filter(Boolean);
+      // ATRAIR: se algum alvo tem ATRAIR, todos os ataques devem ser direcionados a ele
+      const alvoAtrair = alvosJogador.find(c => temKeyword(c, KEYWORDS.ATRAIR));
+
       for (const atk of atacantes) {
         await delay(800);
-        if (alvos.length > 0) {
-          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvos[0].name, dano: atk.atk ?? 0 });
-          addLog(`[COMBATE] ${atk.name} atacou ${alvos[0].name} — confirme ou responda com carta`, '#c84d2a');
+        const atkEfetivo = (atk.atk ?? 0) + calcularFuria(atk, totalEmCampo);
+
+        if (alvosJogador.length > 0) {
+          let candidatos = alvoAtrair ? [alvoAtrair] : alvosJogador;
+          // Evitar VENENO_MORTAL quando possível
+          const semVeneno = candidatos.filter(c => !temKeyword(c, KEYWORDS.VENENO_MORTAL));
+          if (semVeneno.length > 0) candidatos = semVeneno;
+          // Preferir alvo com menor DEF (mais fácil de destruir)
+          const alvo = candidatos.slice().sort((a, b) => (a.def ?? 0) - (b.def ?? 0))[0];
+          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo });
+          addLog(`[COMBATE] ${atk.name} atacou ${alvo.name} — confirme ou responda com carta`, '#c84d2a');
+          break; // aguarda confirmação antes de continuar ataques
         } else {
-          const dano = atk.atk ?? 0;
-          workPcJ = Math.max(0, workPcJ - dano);
+          workPcJ = Math.max(0, workPcJ - atkEfetivo);
           setPcJogador(workPcJ);
-          addLog(`[COMBATE] Ataque direto! ${atk.name} causou ${dano} de dano`, '#c84d2a');
+          addLog(`[COMBATE] Ataque direto! ${atk.name} causou ${atkEfetivo} de dano`, '#c84d2a');
           if (checkFimDeJogo(workPcJ, workPcN)) return;
         }
       }
