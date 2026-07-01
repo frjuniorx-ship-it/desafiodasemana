@@ -1,12 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getDesafioById } from '../api/desafios.js';
-import { getCartaByNome } from '../api/cartas.js';
+import { getCartas } from '../api/cartas.js';
 import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
-  isFolclorica, isPlanta, podeAtacar, podeEquipar,
+  isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea,
   podeSer_Jogada_Folclorica,
-  SLOTS, LIMITE_TURNO, PC_INICIAL,
+  SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
 } from '../engine/rules.js';
+
+const normStr = s =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[-_]/g, ' ').trim();
+
+async function buscarCartaFuzzy(nome) {
+  const cartas = await getCartas();
+  const n = normStr(nome);
+  let found = cartas.find(c => normStr(c.nome) === n);
+  if (found) return { carta: found, sugestao: null };
+  const palavras = n.split(' ').filter(p => p.length > 2);
+  if (palavras.length > 0) {
+    found = cartas.find(c => {
+      const cn = normStr(c.nome);
+      return palavras.filter(p => cn.includes(p)).length >= Math.min(2, palavras.length);
+    });
+    if (found) return { carta: found, sugestao: null };
+  }
+  const sugerida = cartas.find(c => palavras.some(p => normStr(c.nome).includes(p)));
+  return { carta: null, sugestao: sugerida?.nome ?? null };
+}
 
 function shuffle(arr) {
   const a = [...arr];
@@ -89,6 +109,8 @@ export function useBattleState(npc) {
   const [vezDoNpc, setVezDoNpc]           = useState(false);
   const [log, setLog]                     = useState([]);
   const [fimDeJogo, setFimDeJogo]         = useState(null); // null | 'vitoria' | 'derrota'
+  const [prontoParaJogar, setProntoParaJogar] = useState(false);
+  const npcComecouRef = useRef(false);
 
   useEffect(() => {
     if (!npc?._id) return;
@@ -162,9 +184,12 @@ export function useBattleState(npc) {
     setVezDoNpc(true);
     setTurno(nextTurno);
 
-    // 1. Comprar carta(s)
+    // 1. Comprar carta(s) — quem começa não compra no turno 1 (regra 10.0)
     await delay(800);
-    const qtd = (nextTurno === 1 || workMao.length === 0) ? 3 : 1;
+    const ehPrimeiroTurnoNpc = nextTurno === 1;
+    const qtd = workMao.length === 0
+      ? COMPRA_MAO_VAZIA
+      : (ehPrimeiroTurnoNpc && npcComecouRef.current ? 0 : COMPRA_POR_TURNO);
     const compradas = workDeck.splice(0, qtd);
     workMao = [...workMao, ...compradas];
     setDeckNpc([...workDeck]);
@@ -228,19 +253,21 @@ export function useBattleState(npc) {
       }
     }
 
-    // 5. Jogar planta
+    // 5. Jogar planta — entra oculta exceto instantâneas (regra 35.0)
     await delay(800);
     if (!flags.jogouPlanta) {
       const mi = workMao.findIndex(c => isPlanta(c));
       const si = workCampo.plantas.indexOf(null);
       if (mi !== -1 && si !== -1) {
-        const carta = workMao[mi];
+        const raw = workMao[mi];
+        const oculta = !isInstantanea(raw);
+        const carta = { ...raw, oculta };
         workMao.splice(mi, 1);
         workCampo.plantas[si] = carta;
         flags.jogouPlanta = true;
         setMaoNpc([...workMao]);
         setCampoNpc({ ...workCampo, plantas: [...workCampo.plantas] });
-        addLog(`[NPC] Jogou planta ${carta.name}`, '#8ac46a');
+        addLog(`[NPC] Jogou ${oculta ? 'uma planta' : carta.name} em campo`, '#8ac46a');
       }
     }
 
@@ -296,12 +323,12 @@ export function useBattleState(npc) {
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
 
   const jogadorJogarCarta = useCallback(async (nome) => {
-    const carta = await getCartaByNome(nome);
-    if (!carta) {
+    const { carta: raw, sugestao } = await buscarCartaFuzzy(nome);
+    if (!raw) {
       console.warn('[jogador] carta não encontrada na API:', nome);
-      return null;
+      return { carta: null, sugestao };
     }
-    const normalizada = normalizeCardForSlot(carta);
+    const normalizada = normalizeCardForSlot(raw);
     const zona = categoriaParaZona(normalizada.category);
     setCampoJogador(prev => {
       const next = { ...prev };
@@ -322,15 +349,22 @@ export function useBattleState(npc) {
       }
       return next;
     });
-    return normalizada;
+    return { carta: normalizada, sugestao: null };
   }, []);
+
+  const iniciarJogo = useCallback((npcPrimeiro) => {
+    npcComecouRef.current = npcPrimeiro;
+    setProntoParaJogar(true);
+    if (npcPrimeiro) npcExecutarTurno();
+  }, [npcExecutarTurno]);
 
   return {
     loading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
-    turno, vezDoNpc, log, fimDeJogo,
+    turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     npcJogarCarta, jogadorJogarCarta,
     passarVez: npcExecutarTurno,
+    iniciarJogo,
   };
 }

@@ -6,7 +6,6 @@ import PlantSlot from './battle/PlantSlot';
 import SmallSlot from './battle/SmallSlot';
 import UtilSlot from './battle/UtilSlot';
 import NPCHandCard from './battle/NPCHandCard';
-import CardZoom from './battle/CardZoom';
 import ChatBubble from './battle/ChatBubble';
 
 export default function Battle({ npc, onGameOver }) {
@@ -20,11 +19,12 @@ export default function Battle({ npc, onGameOver }) {
     loading: deckLoading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
-    turno, vezDoNpc, log, fimDeJogo, passarVez,
-    jogadorJogarCarta,
+    turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
+    passarVez, jogadorJogarCarta, iniciarJogo,
   } = useBattleState(npc);
 
   const [zoomedCard, setZoomedCard] = useState(null);
+  const [activeTab, setActiveTab] = useState('relato');
   const [chat, setChat] = useState([]);
   const [inputVal, setInputVal] = useState('');
   const chatRef = useRef(null);
@@ -36,6 +36,11 @@ export default function Battle({ npc, onGameOver }) {
   function zoomCard(card) {
     if (!card || card.name === '???') return;
     setZoomedCard(prev => (prev && prev.name === card.name) ? prev : card);
+    setActiveTab('zoom');
+  }
+  function clearZoom() {
+    setActiveTab('relato');
+    setZoomedCard(null);
   }
 
   function sendChat() {
@@ -47,11 +52,13 @@ export default function Battle({ npc, onGameOver }) {
     const matchJogar = /jogu[eo]i\s+(.+)/i.exec(text);
     if (matchJogar) {
       const nomeCarta = matchJogar[1].trim();
-      jogadorJogarCarta(nomeCarta).then(carta => {
+      jogadorJogarCarta(nomeCarta).then(({ carta, sugestao }) => {
         if (carta) {
           setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
+        } else if (sugestao) {
+          setChat(prev => [...prev, { kind: 'system', text: `Não encontrei "${nomeCarta}". Você quis dizer "${sugestao}"?` }]);
         } else {
-          setChat(prev => [...prev, { kind: 'system', text: `Carta "${nomeCarta}" não encontrada. Confirme o nome exato.` }]);
+          setChat(prev => [...prev, { kind: 'system', text: `Carta "${nomeCarta}" não encontrada.` }]);
         }
       });
       return;
@@ -179,13 +186,13 @@ export default function Battle({ npc, onGameOver }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
                   <span />
                   {campoNpc.plantas.map((carta, i) => (
-                    <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                    <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                   <span />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
                   {campoNpc.personagens.map((carta, i) => (
-                    <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} />
+                    <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                 </div>
               </div>
@@ -203,13 +210,13 @@ export default function Battle({ npc, onGameOver }) {
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
                   {campoJogador.personagens.map((carta, i) => (
-                    <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                    <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
                   <span />
                   {campoJogador.plantas.map((carta, i) => (
-                    <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} />
+                    <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                   <span />
                 </div>
@@ -221,35 +228,46 @@ export default function Battle({ npc, onGameOver }) {
 
         {/* ===== SIDEBAR DIREITA ===== */}
         <aside className="battle-sidebar" style={{ height: '100%', maxWidth: 360, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateRows: 'minmax(90px,auto) minmax(220px,1fr) minmax(220px,1fr)', gap: 10, height: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateRows: '1fr minmax(200px,1fr)', gap: 10, height: '100%' }}>
 
-            {/* Log de batalha */}
-            <div style={{ background: 'linear-gradient(180deg, rgba(13,27,42,.65), rgba(10,18,12,.55))', border: '1px solid rgba(212,168,87,.28)', borderRadius: 10, padding: '10px 12px', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexShrink: 0 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c89b3c', boxShadow: '0 0 6px #c89b3c' }} />
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: '.22em', color: '#7a6a45' }}>RELATO DA BATALHA</div>
+            {/* Painel tabbed: Relato / Zoom */}
+            <div style={{ background: 'linear-gradient(180deg, rgba(13,27,42,.65), rgba(10,18,12,.55))', border: '1px solid rgba(212,168,87,.28)', borderRadius: 10, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Abas */}
+              <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid rgba(212,168,87,.18)' }}>
+                {['relato', 'zoom'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{ flex: 1, padding: '8px 0', background: activeTab === tab ? 'rgba(212,168,87,.12)' : 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid #c89b3c' : '2px solid transparent', color: activeTab === tab ? '#d4a857' : '#5a5040', fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: '.2em', cursor: 'pointer', transition: 'color .15s' }}
+                  >
+                    {tab === 'relato' ? 'RELATO' : 'ZOOM'}
+                  </button>
+                ))}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto' }}>
-                {log.length === 0
-                  ? <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 11, color: '#5a5040', opacity: .6 }}>Clique em "Passar a Vez" para iniciar a batalha.</div>
-                  : log.map((ev, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontFamily: "'Lora', serif", fontSize: 12, lineHeight: 1.35 }}>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#5a5040', flexShrink: 0 }}>{ev.t}</span>
-                        <span style={{ color: ev.color }}>{ev.text}</span>
-                      </div>
-                    ))
-                }
-              </div>
-            </div>
 
-            {/* Zoom de carta */}
-            <div style={{ background: 'linear-gradient(180deg, rgba(13,27,42,.5), rgba(10,18,12,.5))', border: '1.5px solid rgba(212,168,87,.4)', borderRadius: 10, minHeight: 0, overflow: 'hidden', position: 'relative', boxShadow: 'inset 0 0 18px rgba(200,155,60,.08)' }}>
-              {/* Ornamentos de canto dourados */}
-              {[{top:4,left:4,bT:true,bL:true},{top:4,right:4,bT:true,bR:true},{bottom:4,left:4,bB:true,bL:true},{bottom:4,right:4,bB:true,bR:true}].map((pos,i) => (
-                <div key={i} style={{ position:'absolute', top:pos.top, bottom:pos.bottom, left:pos.left, right:pos.right, width:18, height:18, borderTop:pos.bT?'1px solid #c89b3c':'none', borderBottom:pos.bB?'1px solid #c89b3c':'none', borderLeft:pos.bL?'1px solid #c89b3c':'none', borderRight:pos.bR?'1px solid #c89b3c':'none', pointerEvents:'none' }} />
-              ))}
-              <div style={{ height: '100%', overflow: 'hidden' }}>
-                <CardZoom card={zoomedCard} />
+              {/* Conteúdo da aba ativa */}
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+
+                {/* Relato */}
+                <div style={{ position: 'absolute', inset: 0, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', opacity: activeTab === 'relato' ? 1 : 0, pointerEvents: activeTab === 'relato' ? 'auto' : 'none', transition: 'opacity .15s' }}>
+                  {log.length === 0
+                    ? <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 11, color: '#5a5040', opacity: .6 }}>Role os dados para iniciar a batalha.</div>
+                    : log.map((ev, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontFamily: "'Lora', serif", fontSize: 12, lineHeight: 1.35 }}>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#5a5040', flexShrink: 0 }}>{ev.t}</span>
+                          <span style={{ color: ev.color }}>{ev.text}</span>
+                        </div>
+                      ))
+                  }
+                </div>
+
+                {/* Zoom — apenas imagem, sem UI extra */}
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: activeTab === 'zoom' ? 1 : 0, pointerEvents: activeTab === 'zoom' ? 'auto' : 'none', transition: 'opacity .15s', background: '#0a1219' }}>
+                  {zoomedCard?.imagem_url
+                    ? <img src={zoomedCard.imagem_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block' }} />
+                    : <div style={{ fontFamily: "'Cinzel', serif", fontStyle: 'italic', fontSize: 12, color: '#5a5040', opacity: .5, textAlign: 'center', padding: 20 }}>passe o cursor sobre uma carta no campo</div>
+                  }
+                </div>
               </div>
             </div>
 
@@ -286,6 +304,12 @@ export default function Battle({ npc, onGameOver }) {
         </aside>
 
       </div>
+      {!prontoParaJogar && !deckLoading && (
+        <DiceModal onResult={(npcPrimeiro, logEntry) => {
+          setChat(prev => [...prev, { kind: 'system', text: logEntry }]);
+          iniciarJogo(npcPrimeiro);
+        }} />
+      )}
       {fimDeJogo && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'linear-gradient(180deg, #1a2e22, #0b1612)', border: `2px solid ${fimDeJogo === 'vitoria' ? '#c89b3c' : '#c84d2a'}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 360, boxShadow: `0 0 60px ${fimDeJogo === 'vitoria' ? 'rgba(200,155,60,.4)' : 'rgba(200,77,42,.4)'}` }}>
@@ -317,6 +341,59 @@ export default function Battle({ npc, onGameOver }) {
         </div>
       )}
     </main>
+  );
+}
+
+function DiceModal({ onResult }) {
+  const [rolando, setRolando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  function rolar() {
+    setRolando(true);
+    let pJ, pN;
+    // Rolar até desempatar
+    do {
+      pJ = Math.ceil(Math.random() * 6);
+      pN = Math.ceil(Math.random() * 6);
+    } while (pJ === pN);
+
+    const npcPrimeiro = pN > pJ;
+    const quem = npcPrimeiro ? 'NPC começa!' : 'Você começa!';
+    const logEntry = `[DADOS] Você tirou ${pJ} — NPC tirou ${pN} — ${quem}`;
+    setResultado({ pJ, pN, npcPrimeiro, logEntry });
+    setRolando(false);
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,.82)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: 'linear-gradient(180deg, #1a2e22, #0b1612)', border: '2px solid rgba(212,168,87,.6)', borderRadius: 16, padding: '36px 44px', textAlign: 'center', minWidth: 320, boxShadow: '0 0 50px rgba(200,155,60,.3)' }}>
+        <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 22, color: '#d4a857', letterSpacing: '.08em', marginBottom: 6 }}>QUEM COMEÇA?</div>
+        <div style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 13, color: '#7a6a45', marginBottom: 28 }}>Role os dados para decidir quem joga primeiro</div>
+
+        {resultado ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginBottom: 20 }}>
+              {[{ label: 'VOCÊ', val: resultado.pJ, color: '#5a8a4a' }, { label: 'NPC', val: resultado.pN, color: '#c84d2a' }].map(({ label, val, color }) => (
+                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 54, height: 54, borderRadius: 10, background: `radial-gradient(circle at 35% 35%, ${color}88, #0b1612)`, border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 28, color: '#e8d5a8', boxShadow: `0 0 12px ${color}66` }}>{val}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color, letterSpacing: '.18em' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 14, color: resultado.npcPrimeiro ? '#c84d2a' : '#8ac46a', marginBottom: 24, letterSpacing: '.06em' }}>
+              {resultado.npcPrimeiro ? 'NPC começa!' : 'Você começa!'}
+            </div>
+            <button onClick={() => onResult(resultado.npcPrimeiro, resultado.logEntry)} style={{ padding: '11px 28px', borderRadius: 8, background: 'radial-gradient(ellipse at 50% 0%, #f5d27a, #c89b3c 50%, #8a5d1f 95%)', border: '1.5px solid #f5d27a', color: '#0b1612', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, letterSpacing: '.14em', cursor: 'pointer' }}>
+              INICIAR BATALHA
+            </button>
+          </>
+        ) : (
+          <button onClick={rolar} disabled={rolando} style={{ padding: '12px 32px', borderRadius: 8, background: 'radial-gradient(ellipse at 50% 0%, #f5d27a, #c89b3c 50%, #8a5d1f 95%)', border: '1.5px solid #f5d27a', color: '#0b1612', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, letterSpacing: '.14em', cursor: 'pointer' }}>
+            🎲 ROLAR DADOS
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

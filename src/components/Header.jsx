@@ -2,15 +2,26 @@ import { useState } from 'react';
 
 export default function Header({ isBattle, onBack, breadcrumb }) {
   const [hoverBack, setHoverBack] = useState(false);
+  const [hoveredHeader, setHoveredHeader] = useState(false);
+  const collapsed = isBattle && !hoveredHeader;
 
   return (
-    <header style={{
-      position: 'sticky', top: 0, zIndex: 10,
+    <header
+      onMouseEnter={() => setHoveredHeader(true)}
+      onMouseLeave={() => setHoveredHeader(false)}
+      style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        overflow: 'hidden',
+        maxHeight: collapsed ? 6 : 80,
+        transition: 'max-height .3s ease',
+        borderBottom: '1px solid rgba(212,168,87,.18)',
+        background: 'linear-gradient(180deg, rgba(10,18,12,.92), rgba(10,18,12,.7))',
+        backdropFilter: 'blur(6px)',
+      }}
+    >
+    <div style={{
       padding: '18px 22px 14px',
       display: 'flex', alignItems: 'center', gap: 14,
-      borderBottom: '1px solid rgba(212,168,87,.18)',
-      background: 'linear-gradient(180deg, rgba(10,18,12,.92), rgba(10,18,12,.7))',
-      backdropFilter: 'blur(6px)',
     }}>
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -87,6 +98,7 @@ export default function Header({ isBattle, onBack, breadcrumb }) {
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#c89b3c', letterSpacing: '.05em' }}>nv. 14 · bandeirante</div>
         </div>
       </div>
+    </div>
     </header>
   );
 }

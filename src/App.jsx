@@ -29,7 +29,7 @@ export default function App() {
         />
         {screen === 'gallery'
           ? <Gallery onPlay={handlePlay} />
-          : <Battle npc={selectedNpc} />
+          : <Battle npc={selectedNpc} onGameOver={() => setScreen('gallery')} />
         }
       </div>
     </>

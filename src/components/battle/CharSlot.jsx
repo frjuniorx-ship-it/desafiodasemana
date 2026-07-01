@@ -1,4 +1,4 @@
-export default function CharSlot({ card, side, selected, attacking, onZoom }) {
+export default function CharSlot({ card, side, selected, attacking, onZoom, onZoomOut }) {
   const filled = !!card;
   const accentColor = side === 'npc' ? '#c84d2a' : '#5a8a4a';
   const portraitLight = side === 'npc' ? '#5a2a1a' : '#3a5a2a';
@@ -24,6 +24,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom }) {
     <div
       onClick={() => filled && onZoom && onZoom(card)}
       onMouseEnter={() => filled && onZoom && onZoom(card)}
+      onMouseLeave={() => onZoomOut && onZoomOut()}
       style={{
         position: 'relative', aspectRatio: '5/7', width: '100%', borderRadius: 6,
         border, background, boxShadow,
