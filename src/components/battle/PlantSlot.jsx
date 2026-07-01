@@ -8,7 +8,7 @@ export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
       onMouseEnter={() => filled && !oculta && onZoom && onZoom(card)}
       onMouseLeave={() => onZoomOut && onZoomOut()}
       style={{
-        aspectRatio: '5/7', width: '100%', borderRadius: 5, overflow: 'hidden',
+        width: '100%', height: '100%', borderRadius: 5, overflow: 'hidden',
         border: filled ? '1px solid rgba(90,138,74,.5)' : '1px dashed rgba(90,138,74,.2)',
         background: filled
           ? (side === 'npc' ? 'linear-gradient(180deg, #1f2e1a, #131e10)' : 'linear-gradient(180deg, #1a281a, #0f1a10)')

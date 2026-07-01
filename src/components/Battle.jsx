@@ -147,7 +147,7 @@ export default function Battle({ npc, onGameOver, token }) {
               {/* NPC medallion */}
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
+                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 16, height: 16, objectFit: 'contain' }} />
               </div>
 
               {/* VS */}
@@ -161,7 +161,7 @@ export default function Battle({ npc, onGameOver, token }) {
               {/* Player medallion */}
               <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
+                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 16, height: 16, objectFit: 'contain' }} />
               </div>
 
               {/* Player deck */}
@@ -183,15 +183,19 @@ export default function Battle({ npc, onGameOver, token }) {
 
             {/* Campo do NPC */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(80,20,30,.35), transparent 75%), linear-gradient(180deg, rgba(38,20,28,.5), rgba(20,12,16,.3))', border: '1px solid rgba(200,77,42,.3)', borderRadius: 12, padding: 10 }}>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                  <span />
+              <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateRows: '1fr 1fr', gap: 8, overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UtilSlot kind="acao" filled={!!campoNpc.acao} side="npc" />
+                  </div>
                   {campoNpc.plantas.map((carta, i) => (
                     <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
-                  <span />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UtilSlot kind="folc" count={campoNpc.folcloricas?.length ?? 0} side="npc" />
+                  </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                   {campoNpc.personagens.map((carta, i) => (
                     <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
@@ -208,18 +212,22 @@ export default function Battle({ npc, onGameOver, token }) {
 
             {/* Campo do jogador */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'radial-gradient(ellipse at center, rgba(26,46,34,.4), transparent 75%), linear-gradient(0deg, rgba(26,46,34,.55), rgba(15,31,23,.35))', border: '1px solid rgba(90,138,74,.4)', borderRadius: 12, padding: 10 }}>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateRows: '1fr 1fr', gap: 8, overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                   {campoJogador.personagens.map((carta, i) => (
                     <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
-                  <span />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UtilSlot kind="acao" filled={!!campoJogador.acao} side="player" />
+                  </div>
                   {campoJogador.plantas.map((carta, i) => (
                     <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
-                  <span />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UtilSlot kind="folc" count={campoJogador.folcloricas?.length ?? 0} side="player" />
+                  </div>
                 </div>
               </div>
             </div>

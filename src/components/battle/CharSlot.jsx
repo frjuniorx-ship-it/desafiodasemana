@@ -26,7 +26,7 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
       onMouseEnter={() => filled && onZoom && onZoom(card)}
       onMouseLeave={() => onZoomOut && onZoomOut()}
       style={{
-        position: 'relative', aspectRatio: '5/7', width: '100%', borderRadius: 6,
+        position: 'relative', width: '100%', height: '100%', borderRadius: 6,
         border, background, boxShadow,
         overflow: 'hidden',
         cursor: filled ? 'pointer' : 'default',
