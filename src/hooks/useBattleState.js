@@ -58,6 +58,7 @@ function normalizeCardForSlot(entrada) {
     imagem_url: entrada.imagem_url ?? entrada.imagemUrl ?? '',
     effect:     effectText,
     wp_id:      entrada.wp_id ?? null,
+    slug:       entrada.slug  ?? null,
     nd:         entrada.nd ?? null,
     mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
     classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
@@ -98,6 +99,86 @@ const campoPadrao = () => ({
   folcloricas: [],
   acao: null,
 });
+
+// Avalia utilidade de jogar uma folclórica com base no estado atual do campo — pura, sem efeitos
+function avaliarUtilidadeFolclorica(folc, estadoCampo) {
+  const { campoJogador, campoNpc, pcNpc } = estadoCampo;
+  const adversarioTemCampo   = campoJogador.personagens.filter(Boolean).length > 0;
+  const adversarioTemPlantas = campoJogador.plantas.filter(Boolean).length > 0;
+  const npcTemCampo          = campoNpc.personagens.filter(Boolean).length > 0;
+  const slug = folc.slug || '';
+
+  const behaviors = folc.effect_blocks?.flatMap(b =>
+    b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
+  ).filter(Boolean) ?? [];
+
+  // remove_card — Boitatá e similares: só vale se adversário tem campo forte
+  if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
+    if (!adversarioTemCampo) return 0;
+    const forcaAdversario = campoJogador.personagens.filter(Boolean)
+      .reduce((acc, c) => acc + (c.atk ?? c.ataque ?? 0), 0);
+    return forcaAdversario > 4 ? 10 : 5;
+  }
+
+  // discard_cards — Quibungo: mais útil quando adversário está acumulando mão
+  if (slug === 'quibungo' || behaviors.includes('discard_cards')) {
+    return adversarioTemCampo ? 3 : 7;
+  }
+
+  // apply_status / modify_stats — Gorjala, Pisadeira: só útil com alvo
+  if (behaviors.includes('apply_status') || behaviors.includes('modify_stats')) {
+    return adversarioTemCampo ? 8 : 0;
+  }
+
+  // return_to_hand — Batatão: ótimo contra personagem com DEF alta
+  if (behaviors.includes('return_to_hand')) {
+    if (!adversarioTemCampo) return 0;
+    const temForte = campoJogador.personagens.filter(Boolean)
+      .some(c => (c.def ?? c.defesa ?? 0) >= 5);
+    return temForte ? 9 : 4;
+  }
+
+  // Iara — remove ATQ >= 3: só útil se adversário tem essas cartas
+  if (slug === 'iara') {
+    const temAlvo = campoJogador.personagens.filter(Boolean)
+      .some(c => (c.atk ?? c.ataque ?? 0) >= 3);
+    return temAlvo ? 9 : 0;
+  }
+
+  // Mão de Cabelo — remove cartas que atacaram
+  if (slug === 'mao-de-cabelo') {
+    return adversarioTemCampo ? 6 : 0;
+  }
+
+  // swap_stats — Uirapuru: útil se adversário tem ATQ > DEF
+  if (slug === 'uirapuru' || behaviors.includes('swap_stats')) {
+    const temAlvo = campoJogador.personagens.filter(Boolean)
+      .some(c => (c.atk ?? c.ataque ?? 0) > (c.def ?? c.defesa ?? 0));
+    return temAlvo ? 8 : 0;
+  }
+
+  // copy_card — Anhangá: sempre útil se há carta em campo
+  if (slug === 'anhanga' || behaviors.includes('copy_card')) {
+    return adversarioTemCampo || npcTemCampo ? 7 : 2;
+  }
+
+  // return_to_deck — Saci-Pererê: recurso de emergência
+  if (slug === 'saci-perere' || behaviors.includes('return_to_deck')) {
+    return (pcNpc < 8 && adversarioTemCampo) ? 8 : 0;
+  }
+
+  // Vitória-Régia — permite dano direto ao PC: útil se NPC tem campo
+  if (slug === 'vitoria-regia') {
+    return npcTemCampo ? 7 : 0;
+  }
+
+  // Curupira — proíbe magias: útil se adversário tem plantas
+  if (slug === 'curupira') {
+    return adversarioTemPlantas ? 6 : 2;
+  }
+
+  return 2; // utilidade baixa para folclórica não reconhecida
+}
 
 export function useBattleState(npc) {
   const [loading, setLoading] = useState(true);
@@ -265,27 +346,28 @@ export function useBattleState(npc) {
       }
     }
 
-    // 5. Jogar folclórica — usa podeSerDescartada para selecionar fodder válido
+    // 5. Jogar folclórica com critério de utilidade — só joga se utilidade >= 5
     await delay(800);
     if (!flags.jogouFolclorica) {
-      const mi = workMao.findIndex(c => podeSer_Jogada_Folclorica(c, workMao));
-      if (mi !== -1) {
-        const folc = workMao[mi];
+      const estadoAtual = { campoJogador, campoNpc: workCampo, pcJogador, pcNpc };
+      const candidatas = workMao
+        .filter(c => isFolclorica(c) && podeSer_Jogada_Folclorica(c, workMao))
+        .map(c => ({ carta: c, utilidade: avaliarUtilidadeFolclorica(c, estadoAtual) }))
+        .filter(({ utilidade }) => utilidade >= 5)
+        .sort((a, b) => b.utilidade - a.utilidade);
+
+      if (candidatas.length > 0) {
+        const { carta: folc, utilidade } = candidatas[0];
         const nd = folc.nd ?? folc.numero_descarte ?? 0;
-        const descIdxs = new Set([mi]);
-        let cnt = 0;
-        for (let i = 0; i < workMao.length && cnt < nd; i++) {
-          if (i !== mi && podeSerDescartada(workMao[i])) { descIdxs.add(i); cnt++; }
-        }
-        const descartar = workMao.filter((_, i) => descIdxs.has(i) && i !== mi);
-        workEsq = [...workEsq, ...descartar];
-        workMao = workMao.filter((_, i) => !descIdxs.has(i));
+        const fodder = workMao.filter(c => c !== folc && podeSerDescartada(c)).slice(0, nd);
+        workMao = workMao.filter(c => c !== folc && !fodder.includes(c));
+        workEsq = [...workEsq, ...fodder];
         workCampo.folcloricas = [...workCampo.folcloricas, folc];
         flags.jogouFolclorica = true;
         setMaoNpc([...workMao]);
         setEsquecimentoNpc([...workEsq]);
         setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
-        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''}`, '#e8a890');
+        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''} (utilidade: ${utilidade})`, '#e8a890');
       }
     }
 
