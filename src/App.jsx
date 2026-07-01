@@ -12,10 +12,13 @@ export default function App() {
   const [screen, setScreen] = useState('gallery')
   const [selectedNpc, setSelectedNpc] = useState(null)
   const [user, setUser] = useState(() => getUsuarioLogado())
+  const [showLogin, setShowLogin] = useState(false)
+  const [pendingNpc, setPendingNpc] = useState(null)
 
   function handlePlay(npc) {
     if (!user) {
-      setScreen('login');
+      setPendingNpc(npc)
+      setShowLogin(true)
       return;
     }
     setSelectedNpc(npc)
@@ -23,8 +26,13 @@ export default function App() {
   }
 
   function handleLogin(userData) {
-    setUser(userData);
-    setScreen('gallery');
+    setUser(userData)
+    setShowLogin(false)
+    if (pendingNpc) {
+      setSelectedNpc(pendingNpc)
+      setPendingNpc(null)
+      setScreen('battle')
+    }
   }
 
   function handleLogout() {
@@ -48,13 +56,13 @@ export default function App() {
           onBack={() => setScreen('gallery')}
           breadcrumb={breadcrumb}
           user={user}
-          onLoginClick={() => setScreen('login')}
+          onLoginClick={() => setShowLogin(true)}
           onPerfilClick={() => setScreen('perfil')}
         />
         {screen === 'gallery' && <Gallery onPlay={handlePlay} />}
         {screen === 'battle' && <Battle npc={selectedNpc} onGameOver={() => setScreen('gallery')} token={user?.token} />}
-        {screen === 'login' && <Login onLogin={handleLogin} onBack={() => setScreen('gallery')} />}
-        {screen === 'perfil' && <Perfil user={user} onLogout={handleLogout} onBack={() => setScreen('gallery')} />}
+        {screen === 'perfil' && user && <Perfil user={user} onLogout={handleLogout} onBack={() => setScreen('gallery')} />}
+        {showLogin && <Login onLogin={handleLogin} onClose={() => { setShowLogin(false); setPendingNpc(null); }} />}
       </div>
     </>
   )

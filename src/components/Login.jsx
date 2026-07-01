@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { login } from '../api/auth.js';
 
-export default function Login({ onLogin, onBack }) {
+export default function Login({ onLogin, onClose }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ export default function Login({ onLogin, onBack }) {
   }
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{
         width: '100%', maxWidth: 400,
         background: 'linear-gradient(180deg, rgba(13,27,42,.85), rgba(10,18,12,.9))',
@@ -116,9 +116,9 @@ export default function Login({ onLogin, onBack }) {
           >
             Criar conta →
           </a>
-          {onBack && (
+          {onClose && (
             <button
-              onClick={onBack}
+              onClick={onClose}
               style={{ background: 'none', border: 'none', fontFamily: "'Cinzel', serif", fontSize: 11, color: '#5a5040', letterSpacing: '.08em', cursor: 'pointer' }}
             >
               ← Voltar
