@@ -128,14 +128,6 @@ export function useBattleState(npc) {
       .finally(() => setLoading(false));
   }, [npc?._id]);
 
-  // Dispara o primeiro turno do NPC após o estado da mão ser atualizado por iniciarJogo
-  useEffect(() => {
-    if (prontoParaJogar && npcComecouRef.current && !npcAutoStartRef.current) {
-      npcAutoStartRef.current = true;
-      npcExecutarTurno();
-    }
-  }, [prontoParaJogar, npcExecutarTurno]);
-
   const npcJogarCarta = useCallback((carta, zona) => {
     setCampoNpc(prev => {
       const next = { ...prev };
@@ -331,6 +323,15 @@ export function useBattleState(npc) {
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
+
+  // Dispara o primeiro turno do NPC após o estado da mão ser atualizado por iniciarJogo.
+  // Fica DEPOIS de npcExecutarTurno para evitar ReferenceError de temporal dead zone (const).
+  useEffect(() => {
+    if (prontoParaJogar && npcComecouRef.current && !npcAutoStartRef.current) {
+      npcAutoStartRef.current = true;
+      npcExecutarTurno();
+    }
+  }, [prontoParaJogar, npcExecutarTurno]);
 
   const jogadorJogarCarta = useCallback(async (nome) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nome);
