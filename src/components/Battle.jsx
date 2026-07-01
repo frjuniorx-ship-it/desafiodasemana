@@ -113,61 +113,53 @@ export default function Battle({ npc }) {
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', overflow: 'hidden', gap: 0 }}>
 
             {/* PC Sidebar */}
-            <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px', borderRight: '1px solid rgba(212,168,87,.18)', marginRight: 10 }}>
+            <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 4px', borderRight: '1px solid rgba(212,168,87,.18)', marginRight: 10 }}>
 
-              {/* Bloco NPC: nome + medallhão + deck + esq */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#a85040', textAlign: 'center', maxWidth: 82, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{npcName.toUpperCase()}</div>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
-                </div>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start', marginTop: 2 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <div style={{ position: 'relative', width: 28, height: 38 }}>
-                      <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
-                      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#d4a857' }}>{deckNpc.length}</div>
-                    </div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 5, color: '#7a6a45', letterSpacing: '.1em' }}>DECK</div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <div style={{ width: 28, height: 38, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 12, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22 }}>
-                      {esquecimentoNpc.length > 0 ? (esquecimentoNpc[esquecimentoNpc.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
-                    </div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 5, color: '#7a6a45', letterSpacing: '.08em' }}>ESQ.</div>
-                  </div>
-                </div>
+              {/* NPC name */}
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#a85040', textAlign: 'center', maxWidth: 82, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{npcName.toUpperCase()}</div>
+
+              {/* NPC deck */}
+              <div style={{ position: 'relative', width: 32, height: 44 }}>
+                <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#d4a857' }}>{deckNpc.length}</div>
+              </div>
+
+              {/* NPC ESQ */}
+              <div style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22 }}>
+                {esquecimentoNpc.length > 0 ? (esquecimentoNpc[esquecimentoNpc.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
+              </div>
+
+              {/* NPC medallion */}
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
               </div>
 
               {/* VS */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, margin: '10px 0' }}>
-                <div style={{ width: 1, height: 8, background: 'rgba(212,168,87,.35)' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, margin: '4px 0' }}>
+                <div style={{ width: 1, height: 6, background: 'rgba(212,168,87,.35)' }} />
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#5a5040', letterSpacing: '.1em' }}>META 20</div>
-                <div style={{ width: 1, height: 8, background: 'rgba(212,168,87,.35)' }} />
+                <div style={{ width: 1, height: 6, background: 'rgba(212,168,87,.35)' }} />
               </div>
 
-              {/* Bloco Jogador: deck + esq + medallhão + nome */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start', marginBottom: 2 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <div style={{ position: 'relative', width: 28, height: 38 }}>
-                      <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
-                      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#d4a857' }}>20</div>
-                    </div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 5, color: '#7a6a45', letterSpacing: '.1em' }}>DECK</div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <div style={{ width: 28, height: 38, background: 'rgba(11,22,18,.5)', border: '1px solid #2a1e10', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 12, color: '#d4a857', opacity: .22 }}>○</div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 5, color: '#7a6a45', letterSpacing: '.08em' }}>ESQ.</div>
-                  </div>
-                </div>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
-                </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#5a8a4a', textAlign: 'center' }}>VOCÊ</div>
+              {/* Player medallion */}
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#6b4a16', letterSpacing: '.1em' }}>PC</div>
               </div>
+
+              {/* Player deck */}
+              <div style={{ position: 'relative', width: 32, height: 44 }}>
+                <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 11, color: '#d4a857' }}>20</div>
+              </div>
+
+              {/* Player ESQ */}
+              <div style={{ width: 32, height: 44, background: 'rgba(11,22,18,.5)', border: '1px solid #2a1e10', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: .22 }}>○</div>
+
+              {/* VOCÊ label */}
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#5a8a4a', textAlign: 'center' }}>VOCÊ</div>
 
             </div>
 
