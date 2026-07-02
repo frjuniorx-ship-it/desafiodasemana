@@ -95,6 +95,7 @@ function normalizeCardForSlot(entrada) {
     entrou_turno_atual: false,
     equipamentos: [],
     efeitosAtivos: [],
+    atacouNesteTurno: false,
   };
 }
 
@@ -476,12 +477,12 @@ export function useBattleState(npc) {
       turnoAtual: prev.turnoAtual + 1,
     }));
 
-    // Regenerar DEF do campo do jogador (início do turno do NPC = fim do turno do jogador)
+    // Regenerar DEF do campo do jogador e resetar flags de ataque (fim do turno do jogador)
     setCampoJogador(prev => ({
       ...prev,
       personagens: prev.personagens.map(c => c && c.defReduzidaTurno
-        ? { ...c, defAtual: c.defBase ?? c.def ?? 0, defReduzidaTurno: false }
-        : c),
+        ? { ...c, defAtual: c.defBase ?? c.def ?? 0, defReduzidaTurno: false, atacouNesteTurno: false }
+        : c ? { ...c, atacouNesteTurno: false } : c),
     }));
 
     // 1. Comprar carta(s) — quem começa não compra no turno 1 (regra 10.0)
@@ -986,6 +987,7 @@ export function useBattleState(npc) {
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
+    if (atacante.atacouNesteTurno) return { ok: false, msg: `${atacante.name} já atacou neste turno (regra 26.0).` };
 
     const alvo = nomeAlvo
       ? buscarNoCampo(campoNpc, nomeAlvo)
@@ -993,6 +995,10 @@ export function useBattleState(npc) {
     if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
 
     resolverCombateCompleto(atacante, alvo, false);
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+    }));
     return { ok: true, atacanteNome: atacante.name, alvoNome: alvo.name };
   }, [campoJogador, campoNpc, resolverCombateCompleto]);
 

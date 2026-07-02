@@ -122,7 +122,7 @@ export default function Battle({ npc, onGameOver, token }) {
             : (cat === 'ação' || cat === 'acao') ? 'acao'
             : cat === 'apoio' || cat === 'equipamento' ? 'equipamento'
             : 'personagem';
-          validarLimiteTurno(tipo);
+          if (!validarLimiteTurno(tipo)) return;
           setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
         });
         break;
@@ -137,6 +137,22 @@ export default function Battle({ npc, onGameOver, token }) {
           } else {
             setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
           }
+        });
+        break;
+      }
+      case 'combinar': {
+        jogadorJogarCarta(resultado.carta1).then(r1 => {
+          jogadorJogarCarta(resultado.carta2).then(r2 => {
+            if (r1?.carta && r2?.carta) {
+              addChatMsg('ai', `Combinação ativada: ${r1.carta.name} + ${r2.carta.name} em campo juntos.`);
+              setNarracaoJogador(prev => ({
+                ...prev,
+                cartasJogadasNesteTurno: { ...prev.cartasJogadasNesteTurno, personagem: 1 },
+              }));
+            } else {
+              addChatMsg('ai', 'Não encontrei uma das cartas. Verifique os nomes e tente novamente.');
+            }
+          });
         });
         break;
       }
@@ -219,9 +235,23 @@ export default function Battle({ npc, onGameOver, token }) {
         });
         break;
       }
-      case 'declarar_descarte':
-        setChat(prev => [...prev, { kind: 'ai', text: folcloricaPendente ? `Descarte de "${resultado.carta}" registrado para ${folcloricaPendente.name}.` : 'Descarte declarado. Informe também qual folclórica ativar.' }]);
+      case 'declarar_descarte': {
+        if (!folcloricaPendente) {
+          addChatMsg('ai', 'Não há folclórica aguardando descarte.');
+          break;
+        }
+        const cartasStr = resultado.carta || '';
+        const quantidade = (cartasStr.match(/,|\s+e\s+/g) || []).length + 1;
+        const ndNecessario = folcloricaPendente.nd || 0;
+        if (quantidade < ndNecessario) {
+          addChatMsg('ai', `${folcloricaPendente.name} exige ${ndNecessario} descarte(s). Você declarou ${quantidade}. Declare mais cartas.`);
+          break;
+        }
+        const cartasList = cartasStr.split(/,|\s+e\s+/).map(s => s.trim()).filter(Boolean);
+        const res = jogadorCompletarFolclorica(cartasList);
+        setChat(prev => [...prev, { kind: 'system', text: res.ok ? `${res.carta.name} ativado após descarte.` : res.msg }]);
         break;
+      }
       case 'declarar_compra': {
         const qtd = resultado.quantidade;
         const maoAnterior = narracaoJogador.maoFinalTurnoAnterior;

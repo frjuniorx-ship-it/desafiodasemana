@@ -130,6 +130,12 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'jogar_planta_virada' };
   }
 
+  // COMBINAR — "combine X com Y", "jogo X combinado com Y", "combino X com Y"
+  const mCombinar = t.match(/(?:combin(?:o|ei|ar)|jog(?:o|uei).+?combinad[oa]\s+com)\s+(?:o\s+|a\s+)?(.+?)\s+(?:com|e)\s+(?:o\s+|a\s+)?(.+)/);
+  if (mCombinar) {
+    return { acao: 'combinar', carta1: limpar(mCombinar[1]), carta2: limpar(mCombinar[2]) };
+  }
+
   // JOGAR CARTA (padrão genérico com verbos expandidos — por último)
   const mJogar = t.match(/(?:jog(?:o|uei|ar)|baix(?:o|ei)|coloc[ao]|ponho|poe|desc(?:o|i)|entr(?:a|ou)|us(?:o|ei)|ativ(?:o|ei)|adiciono|boto|bota)\s+(?:o\s+|a\s+|um(?:a)?\s+)?(.+)/);
   if (mJogar) {
