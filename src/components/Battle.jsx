@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
-import { useBattleState, normStr } from '../hooks/useBattleState.js';
+import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
 import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -24,6 +24,8 @@ export default function Battle({ npc, onGameOver, token }) {
     combatePendente,
     passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
+    jogadorIniciarFolclorica, jogadorCompletarFolclorica, resolverCombateCompleto,
+    folcloricaPendente,
     esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
@@ -95,12 +97,16 @@ export default function Battle({ npc, onGameOver, token }) {
           || campoJogador.personagens.find(c => c && !c.entrou_turno_atual)?.name;
         if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
         const r = jogadorAtacar(cartaNome, resultado.alvo);
-        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${cartaNome} em ${resultado.alvo}.` : r.msg }]);
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${r.atacanteNome ?? cartaNome} em ${r.alvoNome ?? resultado.alvo}.` : r.msg }]);
         break;
       }
       case 'ataque_direto': {
         const atacante = resultado.carta
-          ? campoJogador.personagens.find(c => c && normStr(c.name).includes(normStr(resultado.carta)))
+          ? campoJogador.personagens.reduce((best, c) => {
+              if (!c) return best;
+              const sim = Math.max(similaridade(resultado.carta, c.name), normStr(c.name).includes(normStr(resultado.carta)) ? 1 : 0);
+              return sim > (best?.sim ?? 0) ? { c, sim } : best;
+            }, null)?.c
           : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
         if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
         const r = jogadorAtaqueDireto(atacante.name);
@@ -132,8 +138,24 @@ export default function Battle({ npc, onGameOver, token }) {
         });
         break;
       }
-      case 'descartar':
-        setChat(prev => [...prev, { kind: 'ai', text: 'Descarte manual não implementado. Use folclóricas para descartar.' }]);
+      case 'iniciar_folclorica': {
+        jogadorIniciarFolclorica(resultado.carta).then(r => {
+          if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
+          else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ai', text: `${r.carta.name} requer ${r.nd} descarte(s). Diga: "descarto [carta] e ativo ${r.carta.name}".` }]);
+          else setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
+        });
+        break;
+      }
+      case 'folclorica_com_descarte': {
+        jogadorIniciarFolclorica(resultado.carta).then(r => {
+          if (!r.ok) { setChat(prev => [...prev, { kind: 'system', text: r.msg }]); return; }
+          const res = jogadorCompletarFolclorica(resultado.descarte ? [resultado.descarte] : []);
+          setChat(prev => [...prev, { kind: 'system', text: res.ok ? `${res.carta.name} ativado após descarte.` : res.msg }]);
+        });
+        break;
+      }
+      case 'declarar_descarte':
+        setChat(prev => [...prev, { kind: 'ai', text: folcloricaPendente ? `Descarte de "${resultado.carta}" registrado para ${folcloricaPendente.name}.` : 'Descarte declarado. Informe também qual folclórica ativar.' }]);
         break;
       case 'remover':
         setChat(prev => [...prev, { kind: 'ai', text: 'Remoção manual não disponível.' }]);
@@ -144,7 +166,11 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       case 'confirmar_combate':
         if (combatePendente) {
-          confirmarCombate();
+          if (combatePendente.atacante && combatePendente.alvo) {
+            resolverCombateCompleto(combatePendente.atacante, combatePendente.alvo, true);
+          } else {
+            confirmarCombate();
+          }
           setChat(prev => [...prev, { kind: 'system', text: 'Combate confirmado.' }]);
         } else {
           setChat(prev => [...prev, { kind: 'ai', text: 'Não há combate pendente para confirmar.' }]);

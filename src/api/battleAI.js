@@ -81,16 +81,30 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'revelar_planta', carta: limpar(mRevelar[1]) };
   }
 
+  // FOLCLÓRICA COM DESCARTE — "descarto X e ativo [nome folclórica]"
+  const mFolcDesc = t.match(/descart(?:o|ei)\s+(?:o\s+|a\s+)?(.+?)\s+e\s+(?:ativ(?:o|ei)|us(?:o|ei)|jog(?:o|uei))\s+(?:a\s+folcl[oa]rica\s+|a\s+|o\s+)?(.+)/);
+  if (mFolcDesc) {
+    return { acao: 'folclorica_com_descarte', descarte: limpar(mFolcDesc[1]), carta: limpar(mFolcDesc[2]) };
+  }
+
+  // INICIAR FOLCLÓRICA — "ativo/uso/jogo [folclórica]" quando texto contém "folcl"
+  if (/\bfolcl/.test(t)) {
+    const mFolc = t.match(/(?:ativ(?:o|ei)|us(?:o|ei)|jog(?:o|uei)|baix(?:o|ei)|coloc[ao])\s+(?:a\s+folcl[oa]rica\s+|a\s+|o\s+)?(.+)/);
+    if (mFolc) return { acao: 'iniciar_folclorica', carta: limpar(mFolc[1]) };
+    const mFolcGen = t.match(/folcl[oa]rica\s+(.+)/);
+    if (mFolcGen) return { acao: 'iniciar_folclorica', carta: limpar(mFolcGen[1]) };
+  }
+
   // ATIVAR PLANTA — antes de JOGAR CARTA (ambos usam "uso/ativo")
   const mPlanta = t.match(/(?:ativ(?:o|ei)|vir(?:o|ei))\s+(?:a\s+planta\s+)?(.+)/);
   if (mPlanta) {
     return { acao: 'ativar_planta', carta: limpar(mPlanta[1]) };
   }
 
-  // DESCARTAR
+  // DECLARAR DESCARTE
   const mDescartar = t.match(/(?:descart(?:o|ei)|descartar)\s+(?:o\s+|a\s+)?(.+)/);
   if (mDescartar) {
-    return { acao: 'descartar', carta: limpar(mDescartar[1]) };
+    return { acao: 'declarar_descarte', carta: limpar(mDescartar[1]) };
   }
 
   // JOGAR PLANTA VIRADA — sem nome de carta (antes de JOGAR CARTA para não ser capturado pelo genérico)

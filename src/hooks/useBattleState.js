@@ -12,11 +12,25 @@ import {
 export const normStr = s =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[-_]/g, ' ').trim();
 
+function simBigramas(a, b) {
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return 1;
+  if (na.length < 2 || nb.length < 2) return 0;
+  const bgs = s => { const bg = new Set(); for (let i = 0; i < s.length - 1; i++) bg.add(s[i] + s[i+1]); return bg; };
+  const bgA = bgs(na), bgB = bgs(nb);
+  let inter = 0; bgA.forEach(g => { if (bgB.has(g)) inter++; });
+  return (2 * inter) / (bgA.size + bgB.size);
+}
+export const similaridade = simBigramas;
+
 async function buscarCartaFuzzy(nome) {
   const cartas = await getCartas();
   const n = normStr(nome);
+  // 1. Exato
   let found = cartas.find(c => normStr(c.nome) === n);
   if (found) return { carta: found, sugestao: null };
+  // 2. Inclusão de palavras (>2 chars)
   const palavras = n.split(' ').filter(p => p.length > 2);
   if (palavras.length > 0) {
     found = cartas.find(c => {
@@ -25,8 +39,21 @@ async function buscarCartaFuzzy(nome) {
     });
     if (found) return { carta: found, sugestao: null };
   }
-  const sugerida = cartas.find(c => palavras.some(p => normStr(c.nome).includes(p)));
-  return { carta: null, sugestao: sugerida?.nome ?? null };
+  // 3. Palavra longa (>=4 chars)
+  const longas = n.split(' ').filter(p => p.length >= 4);
+  if (longas.length > 0) {
+    found = cartas.find(c => longas.some(p => normStr(c.nome).includes(p)));
+    if (found) return { carta: found, sugestao: null };
+  }
+  // 4. Bigramas (tolerância a erros de transcrição)
+  let melhor = null, melhorSim = 0;
+  for (const c of cartas) {
+    const sim = simBigramas(nome, c.nome ?? '');
+    if (sim > melhorSim) { melhorSim = sim; melhor = c; }
+  }
+  if (melhorSim >= 0.35) return { carta: melhor, sugestao: null };
+  if (melhorSim >= 0.2) return { carta: null, sugestao: melhor?.nome ?? null };
+  return { carta: null, sugestao: null };
 }
 
 function shuffle(arr) {
@@ -198,6 +225,7 @@ export function useBattleState(npc) {
   const [prontoParaJogar, setProntoParaJogar] = useState(false);
   const [combatePendente, setCombatePendente] = useState(null); // null | { atacanteNome, alvoNome, dano }
   const [esquecimentoJogador, setEsquecimentoJogador] = useState([]);
+  const [folcloricaPendente, setFolcloricaPendente] = useState(null);
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
 
@@ -274,6 +302,14 @@ export function useBattleState(npc) {
     setVezDoNpc(true);
     setTurno(nextTurno);
 
+    // Regenerar DEF do campo do jogador (início do turno do NPC = fim do turno do jogador)
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => c && c.defReduzidaTurno
+        ? { ...c, defAtual: c.defBase ?? c.def ?? 0, defReduzidaTurno: false }
+        : c),
+    }));
+
     // 1. Comprar carta(s) — quem começa não compra no turno 1 (regra 10.0)
     await delay(800);
     const ehPrimeiroTurnoNpc = nextTurno === 1;
@@ -322,7 +358,15 @@ export function useBattleState(npc) {
         const pi = workCampo.personagens.findIndex(c => c && podeEquipar(equip, c));
         if (pi !== -1) {
           const alvo = workCampo.personagens[pi];
-          workCampo.personagens[pi] = { ...alvo, pc: (alvo.pc || 0) + (equip.pc || 0) };
+          workCampo.personagens[pi] = {
+            ...alvo,
+            atkBase: alvo.atkBase ?? alvo.atk ?? 0,
+            defBase: alvo.defBase ?? alvo.def ?? 0,
+            atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
+            def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
+            pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+            equipamentos: [...(alvo.equipamentos ?? []), equip],
+          };
           workMao.splice(mi, 1);
           flags.jogouEquipamento = true;
           setMaoNpc([...workMao]);
@@ -418,7 +462,7 @@ export function useBattleState(npc) {
           if (semVeneno.length > 0) candidatos = semVeneno;
           // Preferir alvo com menor DEF (mais fácil de destruir)
           const alvo = candidatos.slice().sort((a, b) => (a.def ?? 0) - (b.def ?? 0))[0];
-          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo });
+          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo, atacante: atk, alvo });
           addLog(`[COMBATE] ${atk.name} atacou ${alvo.name} — confirme ou responda com carta`, '#c84d2a');
           break; // aguarda confirmação antes de continuar ataques
         } else {
@@ -430,9 +474,14 @@ export function useBattleState(npc) {
       }
     }
 
-    // 8. Passar vez — resetar entrou_turno_atual
+    // 8. Passar vez — resetar entrou_turno_atual e regenerar DEF do NPC
     await delay(800);
-    workCampo.personagens = workCampo.personagens.map(c => c ? { ...c, entrou_turno_atual: false } : null);
+    workCampo.personagens = workCampo.personagens.map(c => c ? {
+      ...c,
+      entrou_turno_atual: false,
+      defAtual: c.defBase ?? c.def ?? 0,
+      defReduzidaTurno: false,
+    } : null);
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
@@ -452,6 +501,187 @@ export function useBattleState(npc) {
     if (pcJogador <= 0) setFimDeJogo('derrota');
     if (pcNpc <= 0) setFimDeJogo('vitoria');
   }, [pcJogador, pcNpc, prontoParaJogar, fimDeJogo]);
+
+  const executarEfeitoFolclorica = useCallback((folc) => {
+    const slug = folc.slug || '';
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    const behaviors = folc.effect_blocks?.flatMap(b =>
+      b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
+    ).filter(Boolean) ?? [];
+
+    if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens.findIndex(Boolean);
+        if (idx !== -1) {
+          addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${personagens[idx].name} do campo do NPC (sem PC).`, '#c89b3c');
+          personagens[idx] = null;
+        }
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'quibungo' || behaviors.includes('discard_cards')) {
+      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'efeito de descarte ativado'}.`, '#c89b3c');
+      return;
+    }
+    if ((behaviors.includes('modify_stats') && !behaviors.includes('apply_status')) || slug === 'gorjala') {
+      setCampoNpc(prev => {
+        const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2) } : null);
+        addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em personagens do NPC.`, '#c89b3c');
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (behaviors.includes('apply_status') || slug === 'pisadeira') {
+      setCampoNpc(prev => {
+        const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true } : null);
+        addLog(`[FOLCLÓRICA] ${folc.name}: paralisou personagens do NPC.`, '#c89b3c');
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (behaviors.includes('return_to_hand') || slug === 'batata' || slug === 'caboclo-dagua') {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens
+          .map((c, i) => ({ c, i })).filter(({ c }) => c)
+          .sort((a, b) => (b.c.def ?? 0) - (a.c.def ?? 0))[0]?.i;
+        if (idx !== undefined) {
+          addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${personagens[idx].name} à mão do NPC.`, '#c89b3c');
+          personagens[idx] = null;
+        }
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'iara') {
+      setCampoNpc(prev => {
+        const personagens = prev.personagens.map(c => {
+          if (c && (c.atk ?? 0) >= 3) {
+            addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${c.name} (ATQ ${c.atk}).`, '#c89b3c');
+            return null;
+          }
+          return c;
+        });
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'uirapuru' || behaviors.includes('swap_stats')) {
+      setCampoNpc(prev => {
+        const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0 } : null);
+        addLog(`[FOLCLÓRICA] ${folc.name}: trocou ATQ e DEF dos personagens do NPC.`, '#c89b3c');
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
+  }, [campoNpc]);
+
+  const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    const atkA = atacanteCard.atk ?? 0;
+    const defD = defensoraCard.defAtual ?? defensoraCard.def ?? 0;
+    const temVeneno = temKeyword(defensoraCard, KEYWORDS.VENENO_MORTAL);
+    const temAtravessar = temKeyword(atacanteCard, KEYWORDS.ATRAVESSAR);
+    const defensoraDestruida = atkA >= defD;
+    const danoAoPC = defensoraDestruida && temAtravessar ? atkA - defD : 0;
+
+    if (defensoraDestruida) {
+      const pcPerdido = pcPerdidoPorDestruicao(defensoraCard);
+      if (npcAtaca) {
+        setPcJogador(p => Math.max(0, p - pcPerdido - danoAoPC));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c) }));
+        addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! Você perde ${pcPerdido + danoAoPC} PC.`, '#c84d2a');
+      } else {
+        setPcNpc(p => Math.max(0, p - pcPerdido - danoAoPC));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c) }));
+        addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! NPC perde ${pcPerdido + danoAoPC} PC.`, '#f5d27a');
+      }
+      if (temVeneno) {
+        if (npcAtaca) {
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+        } else {
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+        }
+        addLog(`[VENENO] ${defensoraCard.name} envenenou ${atacanteCard.name} — removido sem PC.`, '#8a4a8a');
+      }
+    } else {
+      const novaDefD = defD - atkA;
+      if (npcAtaca) {
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
+      } else {
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
+      }
+    }
+
+    // Contra-ataque (regra 24.0) — paralisada contra-ataca (regra 27.0)
+    if (!temVeneno) {
+      const atkD = defensoraCard.atk ?? 0;
+      const defA = atacanteCard.defAtual ?? atacanteCard.def ?? 0;
+      const atacanteDestruido = atkD >= defA;
+      if (atacanteDestruido) {
+        const pcPerdido = pcPerdidoPorDestruicao(atacanteCard);
+        if (npcAtaca) {
+          setPcNpc(p => Math.max(0, p - pcPerdido));
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! NPC perde ${pcPerdido} PC.`, '#f5d27a');
+        } else {
+          setPcJogador(p => Math.max(0, p - pcPerdido));
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! Você perde ${pcPerdido} PC.`, '#c84d2a');
+        }
+      } else if (atkD > 0) {
+        const novaDefA = defA - atkD;
+        if (npcAtaca) {
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
+        } else {
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
+        }
+      }
+    }
+
+    setCombatePendente(null);
+  }, []);
+
+  const jogadorIniciarFolclorica = useCallback(async (nomeFolc) => {
+    const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeFolc);
+    if (!raw) return { ok: false, sugestao, msg: `Folclórica "${nomeFolc}" não encontrada.` };
+    const folc = normalizeCardForSlot(raw);
+    const nd = folc.nd ?? 0;
+    if (nd === 0) {
+      executarEfeitoFolclorica(folc);
+      setCampoJogador(prev => ({ ...prev, folcloricas: [...prev.folcloricas, folc] }));
+      const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      setLog(prev => [...prev, { t: ts, text: `[FOLCLÓRICA] Você ativou ${folc.name}.`, color: '#c89b3c' }]);
+      return { ok: true, carta: folc, precisaDescarte: false };
+    }
+    setFolcloricaPendente(folc);
+    return { ok: true, carta: folc, precisaDescarte: true, nd };
+  }, [executarEfeitoFolclorica]);
+
+  const jogadorCompletarFolclorica = useCallback((cartasDescarte) => {
+    if (!folcloricaPendente) return { ok: false, msg: 'Nenhuma folclórica pendente.' };
+    const folc = folcloricaPendente;
+    setCampoJogador(prev => {
+      let personagens = [...prev.personagens];
+      for (const nome of cartasDescarte) {
+        const n = normStr(nome);
+        const idx = personagens.findIndex(c => c && normStr(c.name).includes(n));
+        if (idx !== -1) personagens[idx] = null;
+      }
+      return { ...prev, personagens, folcloricas: [...prev.folcloricas, folc] };
+    });
+    setEsquecimentoJogador(prev => [...prev, ...cartasDescarte.map(n => ({ name: n, category: 'Descarte' }))]);
+    executarEfeitoFolclorica(folc);
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    setLog(prev => [...prev, { t: ts, text: `[FOLCLÓRICA] ${folc.name} ativado após descarte.`, color: '#c89b3c' }]);
+    setFolcloricaPendente(null);
+    return { ok: true, carta: folc };
+  }, [folcloricaPendente, executarEfeitoFolclorica]);
 
   const jogadorJogarCarta = useCallback(async (nome) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nome);
@@ -529,49 +759,42 @@ export function useBattleState(npc) {
     setCampoJogador(prev => {
       const personagens = [...prev.personagens];
       const alvo = personagens[idx];
-      personagens[idx] = { ...alvo, equipamentos: [...(alvo.equipamentos ?? []), equip] };
+      personagens[idx] = {
+        ...alvo,
+        atkBase: alvo.atkBase ?? alvo.atk ?? 0,
+        defBase: alvo.defBase ?? alvo.def ?? 0,
+        atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
+        def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
+        pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+        equipamentos: [...(alvo.equipamentos ?? []), equip],
+      };
       return { ...prev, personagens };
     });
     return { ok: true, equipNome: equip.name, alvoNome };
   }, [campoJogador]);
 
   const jogadorAtacar = useCallback((nomeAtacante, nomeAlvo) => {
-    const nAtk = normStr(nomeAtacante);
-    const nAlv = normStr(nomeAlvo);
-    const atacante = campoJogador.personagens.find(c => c && normStr(c.name).includes(nAtk));
+    const buscarNoCampo = (campo, nome) => campo.personagens.reduce((best, c) => {
+      if (!c) return best;
+      const n = normStr(nome ?? '');
+      const sim = Math.max(simBigramas(nome, c.name), n && normStr(c.name).includes(n) ? 1 : 0);
+      return sim > (best?.sim ?? 0) ? { c, sim } : best;
+    }, null)?.c;
+
+    const atacante = nomeAtacante
+      ? buscarNoCampo(campoJogador, nomeAtacante)
+      : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
-    const alvo = campoNpc.personagens.find(c => c && normStr(c.name).includes(nAlv));
+
+    const alvo = nomeAlvo
+      ? buscarNoCampo(campoNpc, nomeAlvo)
+      : null;
     if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
-    const { defensoraDestruida, atacanteDestruido, danoAoPC } = resolverCombate(atacante, alvo);
-    const addLog = (text, color = '#e8d5a8') =>
-      setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text, color }]);
-    if (defensoraDestruida) {
-      const pcPerdido = pcPerdidoPorDestruicao(alvo);
-      setPcNpc(p => Math.max(0, p - pcPerdido - danoAoPC));
-      setCampoNpc(prev => {
-        const personagens = [...prev.personagens];
-        const i = personagens.findIndex(c => c?.name === alvo.name);
-        if (i !== -1) personagens[i] = null;
-        return { ...prev, personagens };
-      });
-      addLog(`[COMBATE] ${atacante.name} destruiu ${alvo.name}! NPC perde ${pcPerdido} PC.`, '#f5d27a');
-    } else {
-      addLog(`[COMBATE] ${atacante.name} atacou ${alvo.name} — não destruiu (DEF suficiente).`, '#a89870');
-    }
-    if (atacanteDestruido) {
-      const pcPerdido = pcPerdidoPorDestruicao(atacante);
-      setPcJogador(p => Math.max(0, p - pcPerdido));
-      setCampoJogador(prev => {
-        const personagens = [...prev.personagens];
-        const i = personagens.findIndex(c => c?.name === atacante.name);
-        if (i !== -1) personagens[i] = null;
-        return { ...prev, personagens };
-      });
-      addLog(`[COMBATE] ${atacante.name} foi destruído pelo contra-ataque! Você perde ${pcPerdido} PC.`, '#c84d2a');
-    }
-    return { ok: true };
-  }, [campoJogador, campoNpc]);
+
+    resolverCombateCompleto(atacante, alvo, false);
+    return { ok: true, atacanteNome: atacante.name, alvoNome: alvo.name };
+  }, [campoJogador, campoNpc, resolverCombateCompleto]);
 
   const jogadorAtaqueDireto = useCallback((nomeAtacante) => {
     const nAtk = normStr(nomeAtacante);
@@ -636,9 +859,10 @@ export function useBattleState(npc) {
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
-    combatePendente,
+    combatePendente, folcloricaPendente, setFolcloricaPendente,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
+    jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, resolverCombateCompleto,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,
     iniciarJogo,
