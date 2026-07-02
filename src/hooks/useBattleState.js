@@ -782,6 +782,56 @@ export function useBattleState(npc) {
     addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
   }, [campoNpc]);
 
+  const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false) => {
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    const behaviors = carta.effect_blocks?.flatMap(b =>
+      b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
+    ).filter(Boolean) ?? [];
+
+    if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
+      setCampoJogador(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, paralisado: false, imobilizado: false } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: removeu encantamentos do seu campo.`, '#8ac46a');
+    } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
+      setCampoNpc(prev => ({ ...prev, acao: null }));
+      addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo do NPC.`, '#8ac46a');
+    } else if (behaviors.includes('gain_pc')) {
+      setPcJogador(p => p + 2);
+      addLog(`[PLANTA] ${carta.name}: você recuperou 2 PC.`, '#8ac46a');
+    } else if (behaviors.includes('lose_pc')) {
+      setPcNpc(p => Math.max(0, p - 2));
+      addLog(`[PLANTA] ${carta.name}: NPC perdeu 2 PC.`, '#8ac46a');
+    } else if (behaviors.includes('return_to_hand')) {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens
+          .map((c, i) => ({ c, i })).filter(({ c }) => c)
+          .sort((a, b) => (b.c.atk ?? 0) - (a.c.atk ?? 0))[0]?.i;
+        if (idx !== undefined) {
+          addLog(`[PLANTA] ${carta.name}: devolveu ${personagens[idx].name} à mão do NPC.`, '#8ac46a');
+          personagens[idx] = null;
+        }
+        return { ...prev, personagens };
+      });
+    } else if (behaviors.includes('remove_card')) {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens.findIndex(Boolean);
+        if (idx !== -1) {
+          addLog(`[PLANTA] ${carta.name}: removeu ${personagens[idx].name} do campo do NPC.`, '#8ac46a');
+          personagens[idx] = null;
+        }
+        return { ...prev, personagens };
+      });
+    } else {
+      addLog(`[PLANTA] ${carta.name}: ${carta.magia || carta.combo_habilidade || 'efeito ativado'}.`, '#8ac46a');
+    }
+    if (emResposta) setCombatePendente(null);
+  }, []);
+
   const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
@@ -1110,7 +1160,7 @@ export function useBattleState(npc) {
     narracaoJogador, setNarracaoJogador,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
-    jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, resolverCombateCompleto,
+    jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, resolverCombateCompleto,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,
     iniciarJogo,
