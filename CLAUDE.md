@@ -1,6 +1,6 @@
 # Desafio da Semana — Lendas & Batalhas
 
-Projeto React + Vite hospedado em GitHub Pages (frjuniorx-ship-it.github.io/desafiodasemana).
+Projeto React + Vite hospedado em GitHub Pages.
 API WordPress em https://lendasebatalhas.com.br/wp-json/lendas/v1/
 
 ## Regras obrigatórias
@@ -21,5 +21,5 @@ API WordPress em https://lendasebatalhas.com.br/wp-json/lendas/v1/
 - Lendas & Batalhas é um TCG brasileiro com regras próprias
 - Nunca assumir regras de outros card games (Magic, Yu-Gi-Oh, etc.)
 - Regras oficiais estão em src/engine/rules.js
-- Remoção ≠ Destruição (remoção não gera perda de PC)
-- Destruição: carta vai ao esquecimento + dono perde PC igual ao custo
+- Remoção não gera perda de PC — apenas destruição gera
+- Todo personagem tem direito a contra-ataque (regra 24.0)
