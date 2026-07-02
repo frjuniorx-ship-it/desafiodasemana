@@ -928,6 +928,8 @@ export function useBattleState(npc) {
       : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
+    if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
+    if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
 
     const alvo = nomeAlvo
       ? buscarNoCampo(campoNpc, nomeAlvo)
@@ -939,15 +941,21 @@ export function useBattleState(npc) {
   }, [campoJogador, campoNpc, resolverCombateCompleto]);
 
   const jogadorAtaqueDireto = useCallback((nomeAtacante) => {
+    if (campoNpc.personagens.some(Boolean)) {
+      return { ok: false, msg: 'O NPC tem personagens em campo. Ataque direto não é permitido enquanto houver personagens em campo (regra 28.0).' };
+    }
     const nAtk = normStr(nomeAtacante);
     const atacante = campoJogador.personagens.find(c => c && normStr(c.name).includes(nAtk));
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
-    if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno.` };
-    const dano = atacante.atk ?? 0;
+    if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
+    if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
+    if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
+    const totalEmCampo = campoJogador.personagens.filter(Boolean).length;
+    const dano = (atacante.atk ?? 0) + calcularFuria(atacante, totalEmCampo);
     setPcNpc(p => Math.max(0, p - dano));
     setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE DIRETO] ${atacante.name} causou ${dano} de dano direto ao NPC!`, color: '#f5d27a' }]);
     return { ok: true, dano };
-  }, [campoJogador]);
+  }, [campoJogador, campoNpc]);
 
   const confirmarCombate = useCallback(() => {
     setCombatePendente(prev => {

@@ -142,7 +142,7 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'atacar': {
         const cartaNome = resultado.carta
-          || campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)))?.name;
+          || campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado)?.name;
         if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
         const cartaAtacante = buscarNoCampo(campoJogador.personagens, cartaNome);
         if (cartaAtacante?.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
@@ -154,6 +154,13 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'ataque_direto': {
+        if (campoNpc.personagens.some(Boolean)) {
+          addChatMsg('ai', `O NPC tem personagem(ns) em campo. Ataque direto ao PC não é permitido enquanto houver personagens em campo (regra 28.0). Diga "ataco [personagem] com [sua carta]".`);
+          break;
+        }
+        if (campoNpc.plantas.filter(Boolean).length > 0) {
+          addChatMsg('ai', 'Atenção: o NPC tem planta(s) em campo — pode revelar uma de contra-ataque para bloquear.');
+        }
         const atacante = resultado.carta
           ? buscarNoCampo(campoJogador.personagens, resultado.carta)
           : campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado);
