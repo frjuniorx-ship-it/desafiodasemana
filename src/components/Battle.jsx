@@ -65,6 +65,19 @@ export default function Battle({ npc, onGameOver, token }) {
 
     const addChatMsg = (kind, msg) => setChat(prev => [...prev, { kind, text: msg }]);
 
+    // Busca fuzzy por nome em lista de cartas do campo — threshold 0.30
+    const buscarNoCampo = (lista, nomeBuscado) => {
+      if (!nomeBuscado) return null;
+      const n = normStr(nomeBuscado);
+      let best = null, bestSim = 0;
+      for (const c of lista) {
+        if (!c) continue;
+        const sim = similaridade(normStr(c.name || c.nome || ''), n);
+        if (sim > bestSim) { best = c; bestSim = sim; }
+      }
+      return bestSim >= 0.30 ? best : null;
+    };
+
     function validarLimiteTurno(tipo) {
       const atual = narracaoJogador.cartasJogadasNesteTurno[tipo] || 0;
       const limite = LIMITE_TURNO[tipo] ?? 1;
@@ -131,7 +144,7 @@ export default function Battle({ npc, onGameOver, token }) {
         const cartaNome = resultado.carta
           || campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)))?.name;
         if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
-        const cartaAtacante = campoJogador.personagens.find(c => c && normStr(c.name) === normStr(cartaNome));
+        const cartaAtacante = buscarNoCampo(campoJogador.personagens, cartaNome);
         if (cartaAtacante?.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
           addChatMsg('ai', `${cartaAtacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
           break;
@@ -142,11 +155,7 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'ataque_direto': {
         const atacante = resultado.carta
-          ? campoJogador.personagens.reduce((best, c) => {
-              if (!c) return best;
-              const sim = Math.max(similaridade(resultado.carta, c.name), normStr(c.name).includes(normStr(resultado.carta)) ? 1 : 0);
-              return sim > (best?.sim ?? 0) ? { c, sim } : best;
-            }, null)?.c
+          ? buscarNoCampo(campoJogador.personagens, resultado.carta)
           : campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado);
         if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
         if (atacante.entrou_turno_atual && !temKeyword(atacante, KEYWORDS.INVESTIR)) {
@@ -159,7 +168,9 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'equipar': {
         validarLimiteTurno('equipamento');
-        jogadorEquiparCarta(resultado.carta, resultado.alvo).then(r => {
+        const alvoEmCampo = buscarNoCampo(campoJogador.personagens, resultado.alvo);
+        const alvoNomeExato = alvoEmCampo?.name ?? resultado.alvo;
+        jogadorEquiparCarta(resultado.carta, alvoNomeExato).then(r => {
           setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
         });
         break;
