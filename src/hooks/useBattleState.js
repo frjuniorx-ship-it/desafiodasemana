@@ -226,6 +226,13 @@ export function useBattleState(npc) {
   const [combatePendente, setCombatePendente] = useState(null); // null | { atacanteNome, alvoNome, dano }
   const [esquecimentoJogador, setEsquecimentoJogador] = useState([]);
   const [folcloricaPendente, setFolcloricaPendente] = useState(null);
+  const [narracaoJogador, setNarracaoJogador] = useState({
+    maoDeclarada: null,
+    compraDeclarada: false,
+    cartasJogadasNesteTurno: { personagem: 0, folclorica: 0, acao: 0, equipamento: 0, planta: 0 },
+    turnoAtual: 0,
+    maoFinalTurnoAnterior: null,
+  });
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
 
@@ -301,6 +308,16 @@ export function useBattleState(npc) {
 
     setVezDoNpc(true);
     setTurno(nextTurno);
+
+    // Resetar narração do jogador ao passar vez
+    setNarracaoJogador(prev => ({
+      ...prev,
+      maoFinalTurnoAnterior: prev.maoDeclarada,
+      maoDeclarada: null,
+      compraDeclarada: false,
+      cartasJogadasNesteTurno: { personagem: 0, folclorica: 0, acao: 0, equipamento: 0, planta: 0 },
+      turnoAtual: prev.turnoAtual + 1,
+    }));
 
     // Regenerar DEF do campo do jogador (início do turno do NPC = fim do turno do jogador)
     setCampoJogador(prev => ({
@@ -860,6 +877,7 @@ export function useBattleState(npc) {
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente, folcloricaPendente, setFolcloricaPendente,
+    narracaoJogador, setNarracaoJogador,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, resolverCombateCompleto,

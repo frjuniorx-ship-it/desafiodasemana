@@ -14,6 +14,22 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   // Detecta zona pelo contexto do texto (hint para quem chama)
   const zonaTexto = /\bfolcl/.test(t) ? 'folcloricas' : /\bplanta\b/.test(t) ? 'plantas' : null;
 
+  // DECLARAR COMPRA — "comprei 2 cartas", "peguei uma carta"
+  const mCompra = t.match(/(?:comprei|compro|peguei|tirei)\s+(\d+|uma|um|dois|duas|tres|tres)\s+carta/);
+  if (mCompra) {
+    const qtdMap = { 'uma': 1, 'um': 1, 'dois': 2, 'duas': 2, 'tres': 3 };
+    const qtd = qtdMap[mCompra[1]] ?? parseInt(mCompra[1]) ?? 1;
+    return { acao: 'declarar_compra', quantidade: qtd };
+  }
+
+  // DECLARAR MÃO — "tenho 3 cartas", "estou com 5 cartas na mão"
+  const mMao = t.match(/(?:tenho|estou com|fiquei com)\s+(\d+|uma|um|dois|duas|tres|quatro|cinco|seis|sete|oito)\s+(?:carta|na\s*m[ao]o)/);
+  if (mMao) {
+    const qtdMap = { 'uma': 1, 'um': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'quatro': 4, 'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8 };
+    const qtd = qtdMap[mMao[1]] ?? parseInt(mMao[1]);
+    return { acao: 'declarar_mao', quantidade: qtd };
+  }
+
   // PASSAR VEZ
   if (/\b(passo|fim|termino|acabei|proximo turno|pass|nao tenho mais|sem jogada|finalizo)\b/.test(t)) {
     return { acao: 'passar_vez' };

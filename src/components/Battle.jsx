@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
+import { LIMITE_TURNO } from '../engine/rules.js';
 import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -26,6 +27,7 @@ export default function Battle({ npc, onGameOver, token }) {
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, resolverCombateCompleto,
     folcloricaPendente,
+    narracaoJogador, setNarracaoJogador,
     esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
@@ -61,21 +63,54 @@ export default function Battle({ npc, onGameOver, token }) {
     setInputVal('');
     setChat(prev => [...prev, { kind: 'player', text }]);
 
+    const addChatMsg = (kind, msg) => setChat(prev => [...prev, { kind, text: msg }]);
+
+    function validarLimiteTurno(tipo) {
+      const atual = narracaoJogador.cartasJogadasNesteTurno[tipo] || 0;
+      const limite = LIMITE_TURNO[tipo] ?? 1;
+      if (atual >= limite) {
+        addChatMsg('ia', `Você já jogou ${atual} carta(s) do tipo "${tipo}" nesse turno. O limite é ${limite} por turno. Confirma que é isso mesmo?`);
+        return false;
+      }
+      setNarracaoJogador(prev => ({
+        ...prev,
+        cartasJogadasNesteTurno: {
+          ...prev.cartasJogadasNesteTurno,
+          [tipo]: (prev.cartasJogadasNesteTurno[tipo] || 0) + 1,
+        },
+      }));
+      return true;
+    }
+
     const estado = { turno, nomeNpc: npcName, pcNpc, pcJogador, campoNpc, campoJogador, combatePendente };
     const resultado = processarAcaoBatalha(text, estado);
 
     if (!resultado) {
       const dica = gerarDicaContextual(estado);
-      setChat(prev => [...prev, { kind: 'ai', text: 'Não entendi. Tente: "joguei [carta]", "ataco [alvo] com [carta]", "equipei [X] no [Y]", "passo".' }]);
-      if (dica) setChat(prev => [...prev, { kind: 'ai', text: dica }]);
+      addChatMsg('ai', 'Não entendi. Tente: "joguei [carta]", "ataco [alvo] com [carta]", "equipei [X] no [Y]", "passo".');
+      if (dica) addChatMsg('ai', dica);
       return;
     }
 
     switch (resultado.acao) {
       case 'jogar_carta': {
+        if (!narracaoJogador.compraDeclarada && narracaoJogador.turnoAtual > 1) {
+          addChatMsg('ai', 'Você não declarou quantas cartas comprou nesse turno. Quantas cartas você comprou no início do turno?');
+        }
         jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
-          if (carta) setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
-          else setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+          if (!carta) {
+            setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+            return;
+          }
+          // Determina o tipo para validar limite
+          const cat = (carta.category ?? carta.tipo ?? '').toLowerCase();
+          const tipo = cat.startsWith('folcl') ? 'folclorica'
+            : cat === 'planta' ? 'planta'
+            : (cat === 'ação' || cat === 'acao') ? 'acao'
+            : cat === 'apoio' || cat === 'equipamento' ? 'equipamento'
+            : 'personagem';
+          validarLimiteTurno(tipo);
+          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
         });
         break;
       }
@@ -114,6 +149,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'equipar': {
+        validarLimiteTurno('equipamento');
         jogadorEquiparCarta(resultado.carta, resultado.alvo).then(r => {
           setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
         });
@@ -127,6 +163,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'jogar_planta_virada': {
+        validarLimiteTurno('planta');
         const r = jogadorJogarPlantaVirada();
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? 'Planta colocada em campo (virada).' : r.msg }]);
         break;
@@ -139,6 +176,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'iniciar_folclorica': {
+        validarLimiteTurno('folclorica');
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
           else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ai', text: `${r.carta.name} requer ${r.nd} descarte(s). Diga: "descarto [carta] e ativo ${r.carta.name}".` }]);
@@ -157,6 +195,28 @@ export default function Battle({ npc, onGameOver, token }) {
       case 'declarar_descarte':
         setChat(prev => [...prev, { kind: 'ai', text: folcloricaPendente ? `Descarte de "${resultado.carta}" registrado para ${folcloricaPendente.name}.` : 'Descarte declarado. Informe também qual folclórica ativar.' }]);
         break;
+      case 'declarar_compra': {
+        const qtd = resultado.quantidade;
+        const maoAnterior = narracaoJogador.maoFinalTurnoAnterior;
+        const compraEsperada = maoAnterior === 0 ? 3 : 1;
+        if (maoAnterior !== null && qtd !== compraEsperada) {
+          addChatMsg('ia', `Você tinha ${maoAnterior} carta(s) ao fim do turno anterior — a compra esperada seria ${compraEsperada}. Você comprou ${qtd}. Confirma?`);
+        } else {
+          setChat(prev => [...prev, { kind: 'system', text: `Comprou ${qtd} carta(s).` }]);
+        }
+        setNarracaoJogador(prev => ({
+          ...prev,
+          compraDeclarada: true,
+          maoDeclarada: (prev.maoDeclarada ?? 0) + qtd,
+        }));
+        break;
+      }
+      case 'declarar_mao': {
+        const qtd = resultado.quantidade;
+        setNarracaoJogador(prev => ({ ...prev, maoDeclarada: qtd }));
+        setChat(prev => [...prev, { kind: 'system', text: `Você tem ${qtd} carta(s) na mão.` }]);
+        break;
+      }
       case 'remover':
         setChat(prev => [...prev, { kind: 'ai', text: 'Remoção manual não disponível.' }]);
         break;
