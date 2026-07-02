@@ -276,55 +276,71 @@ export default function Battle({ npc, onGameOver, token }) {
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row', overflow: 'hidden', gap: 0 }}>
 
             {/* PC Sidebar */}
-            <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 4px', borderRight: '1px solid rgba(212,168,87,.18)', marginRight: 10 }}>
+            <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 4px', borderRight: '1px solid rgba(212,168,87,.18)', marginRight: 10 }}>
 
               {/* NPC name */}
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#a85040', textAlign: 'center', maxWidth: 82, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{npcName.toUpperCase()}</div>
 
-              {/* NPC deck */}
-              <div style={{ position: 'relative', width: 32, height: 44 }}>
-                <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>{deckNpc.length}</div>
-              </div>
-
-              {/* NPC ESQ */}
-              <div
-                onClick={() => esquecimentoNpc.length > 0 && setEsquecimentoModal('npc')}
-                style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22, cursor: esquecimentoNpc.length > 0 ? 'pointer' : 'default' }}>
-                {esquecimentoNpc.length > 0 ? (esquecimentoNpc[esquecimentoNpc.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
+              {/* NPC deck + ESQ lado a lado */}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                {/* Deck NPC */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div style={{ position: 'relative', width: 32, height: 44 }}>
+                    <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>{deckNpc.length}</div>
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#5a4a30', letterSpacing: '.1em' }}>DECK</div>
+                </div>
+                {/* ESQ NPC */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div
+                    onClick={() => esquecimentoNpc.length > 0 && setEsquecimentoModal('npc')}
+                    style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #3a2a1a, #1e1208)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.55)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? 1 : .25, cursor: esquecimentoNpc.length > 0 ? 'pointer' : 'default', boxShadow: esquecimentoNpc.length > 0 ? '0 0 8px rgba(212,168,87,.3)' : 'none', transition: 'box-shadow .15s' }}>
+                    {esquecimentoNpc.length > 0 ? esquecimentoNpc.length : '○'}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: esquecimentoNpc.length > 0 ? '#a87a3a' : '#5a4a30', letterSpacing: '.1em' }}>ESQ</div>
+                </div>
               </div>
 
               {/* NPC medallion */}
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
-                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 16, height: 16, objectFit: 'contain' }} />
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 22, color: '#0b1612', lineHeight: 1 }}>{pcNpc}</div>
+                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 14, height: 14, objectFit: 'contain' }} />
               </div>
 
               {/* VS */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, margin: '4px 0' }}>
-                <div style={{ width: 1, height: 6, background: 'rgba(212,168,87,.35)' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{ width: 1, height: 8, background: 'rgba(212,168,87,.35)' }} />
                 <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 10, color: '#8a7a52', letterSpacing: '.2em' }}>VS</div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#5a5040', letterSpacing: '.1em' }}>META 20</div>
-                <div style={{ width: 1, height: 6, background: 'rgba(212,168,87,.35)' }} />
+                <div style={{ width: 1, height: 8, background: 'rgba(212,168,87,.35)' }} />
               </div>
 
               {/* Player medallion */}
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
-                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 16, height: 16, objectFit: 'contain' }} />
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'radial-gradient(circle at 30% 30%, #f5d27a 0%, #c89b3c 35%, #6b4a16 100%)', border: '2px solid #f5d27a', boxShadow: '0 0 14px rgba(200,155,60,.55), inset 0 -3px 8px rgba(0,0,0,.45), inset 0 3px 8px rgba(255,240,200,.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 22, color: '#0b1612', lineHeight: 1 }}>{pcJogador}</div>
+                <img src="https://lendasebatalhas.com.br/wp-content/uploads/2026/07/PC.png" alt="PC" style={{ width: 14, height: 14, objectFit: 'contain' }} />
               </div>
 
-              {/* Player deck */}
-              <div style={{ position: 'relative', width: 32, height: 44 }}>
-                <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>20</div>
-              </div>
-
-              {/* Player ESQ */}
-              <div
-                onClick={() => esquecimentoJogador.length > 0 && setEsquecimentoModal('player')}
-                style={{ width: 32, height: 44, background: esquecimentoJogador.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #1a2e3a, #0d1f2e)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoJogador.length > 0 ? 'rgba(90,138,74,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoJogador.length > 0 ? .85 : .22, cursor: esquecimentoJogador.length > 0 ? 'pointer' : 'default' }}>
-                {esquecimentoJogador.length > 0 ? (esquecimentoJogador[esquecimentoJogador.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
+              {/* Player deck + ESQ lado a lado */}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                {/* Deck Player */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div style={{ position: 'relative', width: 32, height: 44 }}>
+                    <div style={{ position: 'absolute', left: -2, top: 2, right: 2, bottom: -2, background: 'linear-gradient(135deg, #2a1e0e, #0f0a04)', border: '1px solid #5a3a16', borderRadius: 3 }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(200,155,60,.28), transparent 60%), linear-gradient(135deg, #3a2510, #1a0f06)', border: '1px solid #c89b3c', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857' }}>20</div>
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#5a4a30', letterSpacing: '.1em' }}>DECK</div>
+                </div>
+                {/* ESQ Player */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div
+                    onClick={() => esquecimentoJogador.length > 0 && setEsquecimentoModal('player')}
+                    style={{ width: 32, height: 44, background: esquecimentoJogador.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #1a3a2a, #0d2018)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoJogador.length > 0 ? 'rgba(90,168,100,.55)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: esquecimentoJogador.length > 0 ? '#8ac46a' : '#d4a857', opacity: esquecimentoJogador.length > 0 ? 1 : .25, cursor: esquecimentoJogador.length > 0 ? 'pointer' : 'default', boxShadow: esquecimentoJogador.length > 0 ? '0 0 8px rgba(90,168,100,.3)' : 'none', transition: 'box-shadow .15s' }}>
+                    {esquecimentoJogador.length > 0 ? esquecimentoJogador.length : '○'}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: esquecimentoJogador.length > 0 ? '#5a8a4a' : '#5a4a30', letterSpacing: '.1em' }}>ESQ</div>
+                </div>
               </div>
 
               {/* VOCÊ label */}
