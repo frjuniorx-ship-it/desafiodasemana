@@ -94,6 +94,7 @@ function normalizeCardForSlot(entrada) {
     combo_habilidade: entrada.combo_habilidade   ?? null,
     entrou_turno_atual: false,
     equipamentos: [],
+    efeitosAtivos: [],
   };
 }
 
@@ -128,6 +129,33 @@ const campoPadrao = () => ({
   folcloricas: [],
   acao: null,
 });
+
+function decrementarEfeitosCampo(setCampo) {
+  setCampo(prev => {
+    const atualizarCarta = (carta) => {
+      if (!carta) return carta;
+      let c = { ...carta };
+      const efeitosAtivos = (c.efeitosAtivos || [])
+        .map(e => ({ ...e, turnos: e.turnos - 1 }));
+      const gorjalasExpirando = efeitosAtivos.filter(e => e.tipo === 'gorjala' && e.turnos <= 0);
+      for (const g of gorjalasExpirando) {
+        c.atk = (c.atk || 0) + 2;
+        c.def = (c.def || 0) + 2;
+      }
+      const pisadeiraExpirou = efeitosAtivos.some(e => e.tipo === 'pisadeira' && e.turnos <= 0);
+      if (pisadeiraExpirou) { c.paralisado = false; c.paralisadoTurnos = 0; }
+      const uirapuruExpirando = efeitosAtivos.some(e => e.tipo === 'uirapuru' && e.turnos <= 0);
+      if (uirapuruExpirando) { const tmp = c.atk; c.atk = c.def; c.def = tmp; }
+      c.efeitosAtivos = efeitosAtivos.filter(e => e.turnos > 0);
+      return c;
+    };
+    return {
+      ...prev,
+      personagens: prev.personagens.map(atualizarCarta),
+      plantas: prev.plantas.map(atualizarCarta),
+    };
+  });
+}
 
 // Avalia utilidade de jogar uma folclórica com base no estado atual do campo — pura, sem efeitos
 function avaliarUtilidadeFolclorica(folc, estadoCampo) {
@@ -289,6 +317,26 @@ export function useBattleState(npc) {
         b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
       ).filter(Boolean) ?? [];
 
+    const decrementarEfeitosGlobais = () => {
+      const globais = campoNpc.efeitosGlobais || [];
+      globais.forEach(e => {
+        if (e.tipo === 'homem_do_saco') {
+          setPcJogador(prev => Math.max(0, prev - e.pcPorTurno));
+          addLog(`[EFEITO] O Homem do Saco: -${e.pcPorTurno} PC`);
+        }
+      });
+      setCampoNpc(prev => ({
+        ...prev,
+        efeitosGlobais: (prev.efeitosGlobais || [])
+          .map(e => ({ ...e, turnos: e.turnos - 1 }))
+          .filter(e => e.turnos > 0),
+      }));
+    };
+
+    decrementarEfeitosCampo(setCampoJogador);
+    decrementarEfeitosCampo(setCampoNpc);
+    decrementarEfeitosGlobais();
+
     // Executa efeito de folclórica do NPC (afeta campo do JOGADOR)
     const executarEfeitoFolcloricaNpc = (folc) => {
       const behaviors = getBehaviors(folc);
@@ -307,13 +355,13 @@ export function useBattleState(npc) {
         addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'efeito de descarte ativado'}.`, '#c84d2a');
       } else if (behaviors.includes('modify_stats') || slug === 'gorjala') {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2) } : null);
+          const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] } : null);
           addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
       } else if (behaviors.includes('apply_status') || slug === 'pisadeira') {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true } : null);
+          const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
           addLog(`[FOLCLÓRICA] ${folc.name}: paralisou seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
@@ -342,10 +390,16 @@ export function useBattleState(npc) {
         });
       } else if (slug === 'uirapuru' || behaviors.includes('swap_stats')) {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0 } : null);
+          const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'uirapuru', turnos: 2 }] } : null);
           addLog(`[FOLCLÓRICA] ${folc.name}: trocou ATQ e DEF dos seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
+      } else if (slug === 'o-homem-do-saco') {
+        setCampoNpc(prev => ({
+          ...prev,
+          efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'homem_do_saco', turnos: 5, pcPorTurno: 1 }],
+        }));
+        addLog('[EFEITO] O Homem do Saco: você perde 1 PC por turno durante 5 turnos', '#c84d2a');
       } else {
         addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c84d2a');
       }
@@ -625,6 +679,8 @@ export function useBattleState(npc) {
     );
 
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
+    decrementarEfeitosCampo(setCampoJogador);
+    decrementarEfeitosCampo(setCampoNpc);
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
@@ -670,7 +726,7 @@ export function useBattleState(npc) {
     }
     if ((behaviors.includes('modify_stats') && !behaviors.includes('apply_status')) || slug === 'gorjala') {
       setCampoNpc(prev => {
-        const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2) } : null);
+        const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] } : null);
         addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em personagens do NPC.`, '#c89b3c');
         return { ...prev, personagens };
       });
@@ -678,7 +734,7 @@ export function useBattleState(npc) {
     }
     if (behaviors.includes('apply_status') || slug === 'pisadeira') {
       setCampoNpc(prev => {
-        const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true } : null);
+        const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
         addLog(`[FOLCLÓRICA] ${folc.name}: paralisou personagens do NPC.`, '#c89b3c');
         return { ...prev, personagens };
       });
@@ -713,7 +769,7 @@ export function useBattleState(npc) {
     }
     if (slug === 'uirapuru' || behaviors.includes('swap_stats')) {
       setCampoNpc(prev => {
-        const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0 } : null);
+        const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'uirapuru', turnos: 2 }] } : null);
         addLog(`[FOLCLÓRICA] ${folc.name}: trocou ATQ e DEF dos personagens do NPC.`, '#c89b3c');
         return { ...prev, personagens };
       });
