@@ -115,19 +115,15 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!narracaoJogador.compraDeclarada && narracaoJogador.turnoAtual > 1) {
           addChatMsg('ai', 'Você não declarou quantas cartas comprou nesse turno. Quantas cartas você comprou no início do turno?');
         }
-        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao, limitExceeded, tipo, limite }) => {
+          if (limitExceeded) {
+            addChatMsg('ai', `Limite atingido: apenas ${limite} carta(s) do tipo "${tipo}" por turno (regra 20.0).`);
+            return;
+          }
           if (!carta) {
             setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
             return;
           }
-          // Determina o tipo para validar limite
-          const cat = (carta.category ?? carta.tipo ?? '').toLowerCase();
-          const tipo = cat.startsWith('folcl') ? 'folclorica'
-            : cat === 'planta' ? 'planta'
-            : (cat === 'ação' || cat === 'acao') ? 'acao'
-            : cat === 'apoio' || cat === 'equipamento' ? 'equipamento'
-            : 'personagem';
-          if (!validarLimiteTurno(tipo)) return;
           setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
         });
         break;
@@ -182,14 +178,17 @@ export default function Battle({ npc, onGameOver, token }) {
         if (campoNpc.plantas.filter(Boolean).length > 0) {
           addChatMsg('ai', 'Atenção: o NPC tem planta(s) em campo — pode revelar uma de contra-ataque para bloquear.');
         }
-        const atacante = resultado.carta
-          ? buscarNoCampo(campoJogador.personagens, resultado.carta)
-          : campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado);
-        if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
-        if (atacante.entrou_turno_atual && !temKeyword(atacante, KEYWORDS.INVESTIR)) {
-          addChatMsg('ai', `${atacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
+        const candidatos = campoJogador.personagens.filter(c =>
+          c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado && !c.atacouNesteTurno
+        );
+        if (!resultado.carta && candidatos.length > 1) {
+          addChatMsg('ai', `Com qual personagem quer atacar direto? Diga "ataco direto com [nome]". Disponíveis: ${candidatos.map(c => c.name).join(', ')}.`);
           break;
         }
+        const atacante = resultado.carta
+          ? buscarNoCampo(campoJogador.personagens, resultado.carta)
+          : candidatos[0];
+        if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar direto.' }]); break; }
         const r = jogadorAtaqueDireto(atacante.name);
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
         break;

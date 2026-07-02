@@ -478,12 +478,12 @@ export function useBattleState(npc) {
       turnoAtual: prev.turnoAtual + 1,
     }));
 
-    // Regenerar DEF do campo do jogador e resetar flags de ataque (fim do turno do jogador)
+    // Regenerar DEF do campo do jogador e resetar flags de ataque e entrada (fim do turno do jogador)
     setCampoJogador(prev => ({
       ...prev,
       personagens: prev.personagens.map(c => c && c.defReduzidaTurno
-        ? { ...c, defAtual: c.defBase ?? c.def ?? 0, defReduzidaTurno: false, atacouNesteTurno: false }
-        : c ? { ...c, atacouNesteTurno: false } : c),
+        ? { ...c, defAtual: c.defBase ?? c.def ?? 0, defReduzidaTurno: false, atacouNesteTurno: false, entrou_turno_atual: false }
+        : c ? { ...c, atacouNesteTurno: false, entrou_turno_atual: false } : c),
     }));
 
     // 1. Comprar carta(s) — quem começa não compra no turno 1 (regra 10.0)
@@ -891,8 +891,26 @@ export function useBattleState(npc) {
       console.warn('[jogador] carta não encontrada na API:', nome);
       return { carta: null, sugestao };
     }
-    const normalizada = normalizeCardForSlot(raw);
+    const normalizada = { ...normalizeCardForSlot(raw), entrou_turno_atual: true };
     const zona = categoriaParaZona(normalizada.category);
+
+    // Verificar limite de turno antes de colocar (regra 20.0)
+    const cat = (normalizada.category ?? '').toLowerCase();
+    const tipo = cat.startsWith('folcl') ? 'folclorica'
+      : cat === 'planta' ? 'planta'
+      : (cat === 'ação' || cat === 'acao') ? 'acao'
+      : (cat === 'apoio' || cat === 'equipamento') ? 'equipamento'
+      : 'personagem';
+    const atual = narracaoJogador.cartasJogadasNesteTurno[tipo] || 0;
+    const limite = LIMITE_TURNO[tipo] ?? 1;
+    if (atual >= limite) {
+      return { carta: null, sugestao: null, limitExceeded: true, tipo, limite };
+    }
+    setNarracaoJogador(prev => ({
+      ...prev,
+      cartasJogadasNesteTurno: { ...prev.cartasJogadasNesteTurno, [tipo]: (prev.cartasJogadasNesteTurno[tipo] || 0) + 1 },
+    }));
+
     setCampoJogador(prev => {
       const next = { ...prev };
       if (zona === 'personagens') {
@@ -913,7 +931,7 @@ export function useBattleState(npc) {
       return next;
     });
     return { carta: normalizada, sugestao: null };
-  }, []);
+  }, [narracaoJogador]);
 
   const jogadorRevelarPlanta = useCallback(async (nomeCarta, slotIndex) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeCarta);
@@ -1013,18 +1031,28 @@ export function useBattleState(npc) {
     if (campoNpc.personagens.some(Boolean)) {
       return { ok: false, msg: 'O NPC tem personagens em campo. Ataque direto não é permitido enquanto houver personagens em campo (regra 28.0).' };
     }
+    const campoCurrent = campoJogadorRef.current;
     const nAtk = normStr(nomeAtacante);
-    const atacante = campoJogador.personagens.find(c => c && normStr(c.name).includes(nAtk));
+    const atacante = campoCurrent.personagens.find(c => c && normStr(c.name).includes(nAtk));
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
-    const totalEmCampo = campoJogador.personagens.filter(Boolean).length;
+    if (atacante.atacouNesteTurno) return { ok: false, msg: `${atacante.name} já atacou neste turno (regra 26.0).` };
+    const totalEmCampo = campoCurrent.personagens.filter(Boolean).length;
     const dano = (atacante.atk ?? 0) + calcularFuria(atacante, totalEmCampo);
     setPcNpc(p => Math.max(0, p - dano));
     setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE DIRETO] ${atacante.name} causou ${dano} de dano direto ao NPC!`, color: '#f5d27a' }]);
+    campoJogadorRef.current = {
+      ...campoCurrent,
+      personagens: campoCurrent.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+    };
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+    }));
     return { ok: true, dano };
-  }, [campoJogador, campoNpc]);
+  }, [campoNpc]);
 
   const confirmarCombate = useCallback(() => {
     setCombatePendente(prev => {
