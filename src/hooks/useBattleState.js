@@ -63,6 +63,8 @@ function normalizeCardForSlot(entrada) {
     mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
     classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
     effect_blocks: toArray(entrada.effect_blocks ?? []),
+    magia:            entrada.magia              ?? null,
+    combo_habilidade: entrada.combo_habilidade   ?? null,
     entrou_turno_atual: false,
     equipamentos: [],
   };
@@ -195,6 +197,7 @@ export function useBattleState(npc) {
   const [fimDeJogo, setFimDeJogo]         = useState(null); // null | 'vitoria' | 'derrota'
   const [prontoParaJogar, setProntoParaJogar] = useState(false);
   const [combatePendente, setCombatePendente] = useState(null); // null | { atacanteNome, alvoNome, dano }
+  const [esquecimentoJogador, setEsquecimentoJogador] = useState([]);
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
 
@@ -281,8 +284,12 @@ export function useBattleState(npc) {
     workMao = [...workMao, ...compradas];
     setDeckNpc([...workDeck]);
     setMaoNpc([...workMao]);
-    if (compradas.length > 0)
-      addLog(`[NPC] Comprou ${compradas.length} carta${compradas.length !== 1 ? 's' : ''}`, '#a89870');
+    if (compradas.length > 0) {
+      const msgCompra = compradas.length >= 3
+        ? '[NPC] Comprou 3 cartas (mão vazia)'
+        : '[NPC] Comprou uma carta';
+      addLog(msgCompra, '#a89870');
+    }
 
     // 2. Jogar personagem — heurística: maior ATK se oponente tem campo, maior DEF se vazio
     await delay(800);
@@ -357,9 +364,12 @@ export function useBattleState(npc) {
         .sort((a, b) => b.utilidade - a.utilidade);
 
       if (candidatas.length > 0) {
-        const { carta: folc, utilidade } = candidatas[0];
+        const { carta: folc } = candidatas[0];
         const nd = folc.nd ?? folc.numero_descarte ?? 0;
         const fodder = workMao.filter(c => c !== folc && podeSerDescartada(c)).slice(0, nd);
+        if (fodder.length > 0)
+          addLog(`[NPC] Descarta ${fodder.map(c => c.name).join(', ')} para ativar ${folc.name}`, '#e8a890');
+        addLog(`[NPC] Efeito: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}`, '#c89b3c');
         workMao = workMao.filter(c => c !== folc && !fodder.includes(c));
         workEsq = [...workEsq, ...fodder];
         workCampo.folcloricas = [...workCampo.folcloricas, folc];
@@ -367,7 +377,6 @@ export function useBattleState(npc) {
         setMaoNpc([...workMao]);
         setEsquecimentoNpc([...workEsq]);
         setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
-        addLog(`[NPC] Jogou folclórica ${folc.name}${nd > 0 ? ` (descartou ${nd})` : ''} (utilidade: ${utilidade})`, '#e8a890');
       }
     }
 
@@ -473,6 +482,19 @@ export function useBattleState(npc) {
     });
     return { carta: normalizada, sugestao: null };
   }, []);
+
+  const jogadorJogarPlantaVirada = useCallback(() => {
+    const temSlot = campoJogador.plantas.includes(null);
+    if (!temSlot) return { ok: false, msg: 'Campo de plantas cheio.' };
+    setCampoJogador(prev => {
+      const idx = prev.plantas.indexOf(null);
+      if (idx === -1) return prev;
+      const plantas = [...prev.plantas];
+      plantas[idx] = { name: '???', category: 'Planta', tipo: 'Planta', oculta: true, atk: 0, def: 0, pc: 0, imagem_url: '', entrou_turno_atual: false, equipamentos: [] };
+      return { ...prev, plantas };
+    });
+    return { ok: true };
+  }, [campoJogador]);
 
   const jogadorEquiparCarta = useCallback(async (nomeEquip, nomeAlvo) => {
     const { carta: rawEquip } = await buscarCartaFuzzy(nomeEquip);
@@ -597,9 +619,10 @@ export function useBattleState(npc) {
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
-    npcJogarCarta, jogadorJogarCarta, jogadorEquiparCarta,
+    npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     passarVez: npcExecutarTurno,
+    esquecimentoJogador,
     iniciarJogo,
   };
 }

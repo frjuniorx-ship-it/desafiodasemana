@@ -22,12 +22,14 @@ export default function Battle({ npc, onGameOver, token }) {
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
-    passarVez, jogadorJogarCarta, jogadorEquiparCarta,
+    passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
+    esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
 
   const [zoomedCard, setZoomedCard] = useState(null);
+  const [esquecimentoModal, setEsquecimentoModal] = useState(null); // null | 'npc' | 'player'
   const [activeTab, setActiveTab] = useState('relato');
   const [chat, setChat] = useState([]);
   const [inputVal, setInputVal] = useState('');
@@ -109,6 +111,11 @@ export default function Battle({ npc, onGameOver, token }) {
         jogadorEquiparCarta(resultado.carta, resultado.alvo).then(r => {
           setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
         });
+        break;
+      }
+      case 'jogar_planta_virada': {
+        const r = jogadorJogarPlantaVirada();
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? 'Planta colocada em campo (virada).' : r.msg }]);
         break;
       }
       case 'ativar_planta': {
@@ -248,7 +255,9 @@ export default function Battle({ npc, onGameOver, token }) {
               </div>
 
               {/* NPC ESQ */}
-              <div style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22 }}>
+              <div
+                onClick={() => esquecimentoNpc.length > 0 && setEsquecimentoModal('npc')}
+                style={{ width: 32, height: 44, background: esquecimentoNpc.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #2a3a22, #131e10)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoNpc.length > 0 ? 'rgba(212,168,87,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoNpc.length > 0 ? .85 : .22, cursor: esquecimentoNpc.length > 0 ? 'pointer' : 'default' }}>
                 {esquecimentoNpc.length > 0 ? (esquecimentoNpc[esquecimentoNpc.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
               </div>
 
@@ -279,7 +288,11 @@ export default function Battle({ npc, onGameOver, token }) {
               </div>
 
               {/* Player ESQ */}
-              <div style={{ width: 32, height: 44, background: 'rgba(11,22,18,.5)', border: '1px solid #2a1e10', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: .22 }}>○</div>
+              <div
+                onClick={() => esquecimentoJogador.length > 0 && setEsquecimentoModal('player')}
+                style={{ width: 32, height: 44, background: esquecimentoJogador.length > 0 ? 'repeating-linear-gradient(118deg, rgba(0,0,0,.18) 0 2px, transparent 2px 6px), linear-gradient(180deg, #1a2e3a, #0d1f2e)' : 'rgba(11,22,18,.5)', border: `1px solid ${esquecimentoJogador.length > 0 ? 'rgba(90,138,74,.4)' : '#2a1e10'}`, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 14, color: '#d4a857', opacity: esquecimentoJogador.length > 0 ? .85 : .22, cursor: esquecimentoJogador.length > 0 ? 'pointer' : 'default' }}>
+                {esquecimentoJogador.length > 0 ? (esquecimentoJogador[esquecimentoJogador.length-1]?.name?.[0] || '?').toUpperCase() : '○'}
+              </div>
 
               {/* VOCÊ label */}
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, letterSpacing: '.1em', color: '#5a8a4a', textAlign: 'center' }}>VOCÊ</div>
@@ -464,6 +477,29 @@ export default function Battle({ npc, onGameOver, token }) {
       {toast && (
         <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '10px 20px', borderRadius: 8, background: 'rgba(13,27,42,.95)', border: '1px solid rgba(212,168,87,.5)', fontFamily: "'Lora', serif", fontSize: 13, color: '#e8d5a8', boxShadow: '0 4px 20px rgba(0,0,0,.6)', whiteSpace: 'nowrap' }}>
           {toast}
+        </div>
+      )}
+      {esquecimentoModal && (
+        <div onClick={() => setEsquecimentoModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'linear-gradient(180deg, #1a2e22, #0b1612)', border: '2px solid rgba(212,168,87,.5)', borderRadius: 14, padding: '24px 28px', minWidth: 340, maxWidth: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 0 40px rgba(0,0,0,.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 12, color: '#d4a857', letterSpacing: '.1em' }}>
+                ESQUECIMENTO — {esquecimentoModal === 'npc' ? npcName.toUpperCase() : 'VOCÊ'}
+              </div>
+              <button onClick={() => setEsquecimentoModal(null)} style={{ background: 'none', border: 'none', color: '#7a6a45', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: 8 }}>
+              {(esquecimentoModal === 'npc' ? [...esquecimentoNpc].reverse() : [...esquecimentoJogador].reverse()).map((carta, i) => (
+                <div key={i} onClick={() => { zoomCard(carta); setEsquecimentoModal(null); }} style={{ aspectRatio: '5/7', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(212,168,87,.3)', background: '#0b1612', cursor: 'pointer', position: 'relative' }}>
+                  {carta.imagem_url
+                    ? <img src={carta.imagem_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cinzel Decorative', serif", fontWeight: 900, fontSize: 20, color: '#d4a857', opacity: .6 }}>{(carta.name?.[0] || '?').toUpperCase()}</div>
+                  }
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,.75)', fontFamily: "'Cinzel', serif", fontSize: 7, color: '#e8d5a8', textAlign: 'center', padding: '2px 3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{carta.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </main>

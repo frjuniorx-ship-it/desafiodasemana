@@ -31,8 +31,7 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   }
 
   // ATAQUE DIRETO GENÉRICO — vem antes de "ataco X com Y" para que "direto" não seja tratado como nome de alvo
-  if (/(?:atac[oa]|ataquei)\s+(?:direto|(?:o\s+)?pc|os pontos|diretamente)/.test(t) ||
-      /ataque\s+direto/.test(t)) {
+  if (/(?:atac[oa]|ataque|mand[oa]|caus[oa])\s+(?:direto|nos?\s+pc|[ao]\s+pc|[ao]\s+jogador|na\s+vida|dano\s+direto)/.test(t)) {
     return { acao: 'ataque_direto' };
   }
 
@@ -82,6 +81,13 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   const mDescartar = t.match(/(?:descart(?:o|ei)|descartar)\s+(?:o\s+|a\s+)?(.+)/);
   if (mDescartar) {
     return { acao: 'descartar', carta: limpar(mDescartar[1]) };
+  }
+
+  // JOGAR PLANTA VIRADA — sem nome de carta (antes de JOGAR CARTA para não ser capturado pelo genérico)
+  if (/(?:coloc[oa]|boto|bota|ponho|jog[oa]|baix[oa])\s+uma\s+planta/.test(t) ||
+      /\bplanta\s+(?:em\s+campo|virada?|sem\s+revelar)\b/.test(t) ||
+      /^planta\s+em\s+campo$/.test(t)) {
+    return { acao: 'jogar_planta_virada' };
   }
 
   // JOGAR CARTA (padrão genérico com verbos expandidos — por último)
