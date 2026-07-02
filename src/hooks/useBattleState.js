@@ -483,6 +483,24 @@ export function useBattleState(npc) {
     return { carta: normalizada, sugestao: null };
   }, []);
 
+  const jogadorRevelarPlanta = useCallback(async (nomeCarta, slotIndex) => {
+    const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeCarta);
+    if (!raw) return { ok: false, sugestao };
+    const normalizada = normalizeCardForSlot(raw);
+    setCampoJogador(prev => {
+      const plantas = [...prev.plantas];
+      if (slotIndex !== undefined && plantas[slotIndex]?.oculta) {
+        plantas[slotIndex] = { ...normalizada, oculta: false };
+        return { ...prev, plantas };
+      }
+      const idx = plantas.findIndex(c => c?.oculta);
+      if (idx === -1) return prev;
+      plantas[idx] = { ...normalizada, oculta: false };
+      return { ...prev, plantas };
+    });
+    return { ok: true, carta: normalizada };
+  }, []);
+
   const jogadorJogarPlantaVirada = useCallback(() => {
     const temSlot = campoJogador.plantas.includes(null);
     if (!temSlot) return { ok: false, msg: 'Campo de plantas cheio.' };
@@ -619,7 +637,7 @@ export function useBattleState(npc) {
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
-    npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorEquiparCarta,
+    npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,

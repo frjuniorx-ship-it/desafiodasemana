@@ -71,6 +71,16 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     };
   }
 
+  // REVELAR PLANTA — "3 espaço de planta revelo capim limão" ou só "revelo capim limão"
+  const mRevelarComSlot = t.match(/^(\d+)[°ºo]?\s+(?:espaco|slot|posic[ao]o?)(?:\s+de\s+planta)?\s+(?:rev[ei]l[oa]?|descubr[oa])\s+(?:a\s+planta\s+|o\s+|a\s+)?(.+)/);
+  if (mRevelarComSlot) {
+    return { acao: 'revelar_planta', carta: limpar(mRevelarComSlot[2]), slot: parseInt(mRevelarComSlot[1]) - 1 };
+  }
+  const mRevelar = t.match(/(?:rev[ei]l[oa]?|revela[nr]?|descubr[oa])\s+(?:a\s+planta\s+|o\s+|a\s+)?(.+)/);
+  if (mRevelar) {
+    return { acao: 'revelar_planta', carta: limpar(mRevelar[1]) };
+  }
+
   // ATIVAR PLANTA — antes de JOGAR CARTA (ambos usam "uso/ativo")
   const mPlanta = t.match(/(?:ativ(?:o|ei)|vir(?:o|ei))\s+(?:a\s+planta\s+)?(.+)/);
   if (mPlanta) {

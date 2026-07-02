@@ -22,7 +22,7 @@ export default function Battle({ npc, onGameOver, token }) {
     campoJogador, pcJogador,
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente,
-    passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorEquiparCarta,
+    passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     esquecimentoJogador,
     iniciarJogo,
@@ -110,6 +110,13 @@ export default function Battle({ npc, onGameOver, token }) {
       case 'equipar': {
         jogadorEquiparCarta(resultado.carta, resultado.alvo).then(r => {
           setChat(prev => [...prev, { kind: 'system', text: r.ok ? `${r.equipNome} equipado em ${r.alvoNome}.` : r.msg }]);
+        });
+        break;
+      }
+      case 'revelar_planta': {
+        jogadorRevelarPlanta(resultado.carta, resultado.slot).then(r => {
+          if (r.ok) setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} revelada em campo.` }]);
+          else setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
         });
         break;
       }

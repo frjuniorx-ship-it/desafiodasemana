@@ -1,6 +1,6 @@
 export default function PlantSlot({ card, side, onZoom, onZoomOut }) {
   const filled = !!card;
-  const oculta = filled && side === 'npc' && card.oculta;
+  const oculta = filled && card.oculta;
 
   return (
     <div
