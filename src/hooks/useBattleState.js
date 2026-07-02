@@ -264,6 +264,7 @@ export function useBattleState(npc) {
   });
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
+  const campoJogadorRef = useRef(campoPadrao());
 
   useEffect(() => {
     if (!npc?._id) return;
@@ -701,6 +702,8 @@ export function useBattleState(npc) {
     if (pcNpc <= 0) setFimDeJogo('vitoria');
   }, [pcJogador, pcNpc, prontoParaJogar, fimDeJogo]);
 
+  useEffect(() => { campoJogadorRef.current = campoJogador; }, [campoJogador]);
+
   const executarEfeitoFolclorica = useCallback((folc) => {
     const slug = folc.slug || '';
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -973,6 +976,7 @@ export function useBattleState(npc) {
   }, [campoJogador]);
 
   const jogadorAtacar = useCallback((nomeAtacante, nomeAlvo) => {
+    const campoCurrent = campoJogadorRef.current;
     const buscarNoCampo = (campo, nome) => campo.personagens.reduce((best, c) => {
       if (!c) return best;
       const n = normStr(nome ?? '');
@@ -981,26 +985,29 @@ export function useBattleState(npc) {
     }, null)?.c;
 
     const atacante = nomeAtacante
-      ? buscarNoCampo(campoJogador, nomeAtacante)
-      : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
+      ? buscarNoCampo(campoCurrent, nomeAtacante)
+      : campoCurrent.personagens.find(c => c && !c.entrou_turno_atual);
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
     if (atacante.atacouNesteTurno) return { ok: false, msg: `${atacante.name} já atacou neste turno (regra 26.0).` };
 
-    const alvo = nomeAlvo
-      ? buscarNoCampo(campoNpc, nomeAlvo)
-      : null;
+    const alvo = nomeAlvo ? buscarNoCampo(campoNpc, nomeAlvo) : null;
     if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
 
     resolverCombateCompleto(atacante, alvo, false);
+    // Atualiza ref imediatamente para bloquear duplo-ataque na mesma rodada (regra 26.0)
+    campoJogadorRef.current = {
+      ...campoCurrent,
+      personagens: campoCurrent.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+    };
     setCampoJogador(prev => ({
       ...prev,
       personagens: prev.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
     }));
     return { ok: true, atacanteNome: atacante.name, alvoNome: alvo.name };
-  }, [campoJogador, campoNpc, resolverCombateCompleto]);
+  }, [campoNpc, resolverCombateCompleto]);
 
   const jogadorAtaqueDireto = useCallback((nomeAtacante) => {
     if (campoNpc.personagens.some(Boolean)) {

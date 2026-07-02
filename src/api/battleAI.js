@@ -36,7 +36,7 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   }
 
   // CONFIRMAR COMBATE
-  if (/\b(confirmo|ok|aceito|sem resposta|confirmar|tudo certo|pode resolver)\b/.test(t)) {
+  if (/^(confirmo|ok|aceito|sem resposta|confirmar|confirmado|pode|segue|resolve|sim|tudo certo|pode resolver|vamos|vai|continua|next)\b/.test(t)) {
     return { acao: 'confirmar_combate' };
   }
 
@@ -47,7 +47,7 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   }
 
   // ATAQUE DIRETO GENÉRICO — vem antes de "ataco X com Y" para que "direto" não seja tratado como nome de alvo
-  if (/(?:atac[oa]|ataque|mand[oa]|caus[oa])\s+(?:direto|nos?\s+pc|[ao]\s+pc|[ao]\s+jogador|na\s+vida|dano\s+direto)/.test(t)) {
+  if (/(?:atac[oa]|ataque|mand[oa]|caus[oa]|v[oó]|bate)\s+(?:direto|diretamente|nos?\s+pc|[ao]\s+pc|[ao]\s+jogador|na\s+vida|dano\s+direto)/.test(t)) {
     return { acao: 'ataque_direto' };
   }
 

@@ -39,6 +39,7 @@ export default function Battle({ npc, onGameOver, token }) {
   const [inputVal, setInputVal] = useState('');
   const [micAtivo, setMicAtivo] = useState(false);
   const [toast, setToast] = useState('');
+  const [acoesRapidas, setAcoesRapidas] = useState([]);
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
   const sendChatRef = useRef(null);
@@ -46,6 +47,10 @@ export default function Battle({ npc, onGameOver, token }) {
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [chat]);
+
+  useEffect(() => {
+    setAcoesRapidas(combatePendente ? ['confirmar_combate', 'passar_vez'] : []);
+  }, [combatePendente]);
 
   function zoomCard(card) {
     if (!card || card.name === '???') return;
@@ -219,7 +224,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'iniciar_folclorica': {
-        validarLimiteTurno('folclorica');
+        if (!validarLimiteTurno('folclorica')) break;
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
           else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ai', text: `${r.carta.name} requer ${r.nd} descarte(s). Diga: "descarto [carta] e ativo ${r.carta.name}".` }]);
@@ -228,6 +233,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'folclorica_com_descarte': {
+        if (!validarLimiteTurno('folclorica')) break;
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) { setChat(prev => [...prev, { kind: 'system', text: r.msg }]); return; }
           const res = jogadorCompletarFolclorica(resultado.descarte ? [resultado.descarte] : []);
@@ -575,6 +581,19 @@ export default function Battle({ npc, onGameOver, token }) {
               <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {chat.map((m, i) => <ChatBubble key={i} msg={m} />)}
               </div>
+              {acoesRapidas.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, padding: '4px 8px', flexWrap: 'wrap', flexShrink: 0, borderTop: '1px solid rgba(212,168,87,.1)' }}>
+                  {acoesRapidas.map(acao => (
+                    <button
+                      key={acao}
+                      onClick={() => sendChat(acao === 'confirmar_combate' ? 'confirmo' : 'passo')}
+                      style={{ padding: '5px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontFamily: "'Cinzel', serif", letterSpacing: '.1em', background: acao === 'confirmar_combate' ? 'rgba(200,155,60,.2)' : 'rgba(26,46,34,.4)', border: `1px solid ${acao === 'confirmar_combate' ? '#c89b3c' : '#5a8a4a'}`, color: acao === 'confirmar_combate' ? '#d4a857' : '#8ac46a' }}
+                    >
+                      {acao === 'confirmar_combate' ? '✓ CONFIRMAR' : '⏭ PASSO'}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div style={{ padding: '8px 8px 10px', flexShrink: 0, borderTop: '1px solid rgba(212,168,87,.18)', display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(10,18,12,.4)' }}>
                 <button
                   onClick={toggleMic}
