@@ -66,36 +66,36 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
               }
             </div>
           )}
-          {/* Stats column — right side, stacked vertically, pointer-events: none */}
-          <div style={{ position: 'absolute', top: 2, bottom: 14, right: 2, width: 20, pointerEvents: 'none', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          {/* Stats column — right side, full height, pointer-events: none */}
+          <div style={{ position: 'absolute', inset: 0, right: 0, left: 'auto', width: 22, pointerEvents: 'none', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0 }}>
             {(card.pc ?? 0) > 0 && (
-              <div style={{ width: 20, background: 'rgba(180,130,20,.9)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#fff8a0', fontWeight: 700 }}>{card.pc}</span>
+              <div style={{ flex: 1, background: 'rgba(160,110,0,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#fff8a0', fontWeight: 900, lineHeight: 1 }}>{card.pc}</span>
               </div>
             )}
-            <div style={{ width: 20, background: 'rgba(180,50,30,.88)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#fff', fontWeight: 700 }}>{card.atqAtual ?? card.atk ?? 0}</span>
+            <div style={{ flex: 1, background: 'rgba(30,70,180,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#c8e0ff', fontWeight: 900, lineHeight: 1 }}>{card.atqAtual ?? card.atk ?? 0}</span>
             </div>
-            <div style={{ width: 20, background: 'rgba(40,80,180,.88)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, color: '#c8e0ff', fontWeight: 700 }}>{card.defAtual ?? card.def ?? 0}</span>
+            <div style={{ flex: 1, background: 'rgba(180,40,30,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#ffc8c8', fontWeight: 900, lineHeight: 1 }}>{card.defAtual ?? card.def ?? 0}</span>
             </div>
             {card.paralisada && (
-              <div style={{ width: 20, background: 'rgba(60,80,200,.8)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'rgba(60,80,200,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#c8d0ff', fontWeight: 700 }}>PAR</span>
               </div>
             )}
             {card.imobilizada && (
-              <div style={{ width: 20, background: 'rgba(90,20,160,.8)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'rgba(90,20,160,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#d0b0ff', fontWeight: 700 }}>IMO</span>
               </div>
             )}
             {card.arruinada && (
-              <div style={{ width: 20, background: 'rgba(200,100,0,.9)', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'rgba(200,100,0,.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#fff8e8', fontWeight: 700 }}>ARR</span>
               </div>
             )}
             {card.furiaBonus > 0 && (
-              <div style={{ width: 20, background: 'rgba(160,110,0,.9)', border: '1px solid #f5d27a', borderRadius: 2, padding: '1px 0', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'rgba(160,110,0,.9)', borderLeft: '1px solid #f5d27a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#fff8a0', fontWeight: 700 }}>FÚR</span>
               </div>
             )}
