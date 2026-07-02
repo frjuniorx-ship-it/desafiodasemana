@@ -3,7 +3,7 @@ import { getDesafioById } from '../api/desafios.js';
 import { getCartas } from '../api/cartas.js';
 import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
-  isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea,
+  isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea, isEspera,
   podeSer_Jogada_Folclorica, resolverCombate, pcPerdidoPorDestruicao,
   podeSerDescartada, calcularFuria, temKeyword, KEYWORDS,
   SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
@@ -283,6 +283,109 @@ export function useBattleState(npc) {
     const addLog = (text, color = '#e8d5a8') =>
       setLog(prev => [...prev, { t: now(), text, color }]);
 
+    // Extrai behavior slugs de effect_blocks
+    const getBehaviors = (carta) =>
+      carta.effect_blocks?.flatMap(b =>
+        b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
+      ).filter(Boolean) ?? [];
+
+    // Executa efeito de folclórica do NPC (afeta campo do JOGADOR)
+    const executarEfeitoFolcloricaNpc = (folc) => {
+      const behaviors = getBehaviors(folc);
+      const slug = folc.slug || '';
+      if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
+        setCampoJogador(prev => {
+          const personagens = [...prev.personagens];
+          const idx = personagens.findIndex(Boolean);
+          if (idx !== -1) {
+            addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${personagens[idx].name} do seu campo.`, '#c84d2a');
+            personagens[idx] = null;
+          }
+          return { ...prev, personagens };
+        });
+      } else if (slug === 'quibungo' || behaviors.includes('discard_cards')) {
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'efeito de descarte ativado'}.`, '#c84d2a');
+      } else if (behaviors.includes('modify_stats') || slug === 'gorjala') {
+        setCampoJogador(prev => {
+          const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2) } : null);
+          addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em seus personagens.`, '#c84d2a');
+          return { ...prev, personagens };
+        });
+      } else if (behaviors.includes('apply_status') || slug === 'pisadeira') {
+        setCampoJogador(prev => {
+          const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true } : null);
+          addLog(`[FOLCLÓRICA] ${folc.name}: paralisou seus personagens.`, '#c84d2a');
+          return { ...prev, personagens };
+        });
+      } else if (behaviors.includes('return_to_hand')) {
+        setCampoJogador(prev => {
+          const personagens = [...prev.personagens];
+          const idx = personagens
+            .map((c, i) => ({ c, i })).filter(({ c }) => c)
+            .sort((a, b) => (b.c.def ?? 0) - (a.c.def ?? 0))[0]?.i;
+          if (idx !== undefined) {
+            addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${personagens[idx].name} à sua mão.`, '#c84d2a');
+            personagens[idx] = null;
+          }
+          return { ...prev, personagens };
+        });
+      } else if (slug === 'iara') {
+        setCampoJogador(prev => {
+          const personagens = prev.personagens.map(c => {
+            if (c && (c.atk ?? 0) >= 3) {
+              addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${c.name} (ATQ ${c.atk}).`, '#c84d2a');
+              return null;
+            }
+            return c;
+          });
+          return { ...prev, personagens };
+        });
+      } else if (slug === 'uirapuru' || behaviors.includes('swap_stats')) {
+        setCampoJogador(prev => {
+          const personagens = prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0 } : null);
+          addLog(`[FOLCLÓRICA] ${folc.name}: trocou ATQ e DEF dos seus personagens.`, '#c84d2a');
+          return { ...prev, personagens };
+        });
+      } else {
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c84d2a');
+      }
+    };
+
+    // Executa efeito de planta instantânea do NPC
+    const executarEfeitoPlantaNpc = (carta) => {
+      const behaviors = getBehaviors(carta);
+      if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
+        setCampoNpc(prev => ({
+          ...prev,
+          personagens: prev.personagens.map(c => c ? { ...c, paralisada: false, imobilizada: false, arruinada: false } : null),
+        }));
+        addLog(`[PLANTA] ${carta.name}: removeu encantamentos do campo NPC.`, '#8ac46a');
+      } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
+        setCampoJogador(prev => ({ ...prev, acao: null }));
+        addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo adversário.`, '#8ac46a');
+      } else if (behaviors.includes('gain_pc')) {
+        setPcNpc(p => p + 2);
+        addLog(`[PLANTA] ${carta.name}: NPC recuperou 2 PC.`, '#8ac46a');
+      } else if (behaviors.includes('lose_pc')) {
+        setPcJogador(p => Math.max(0, p - 2));
+        addLog(`[PLANTA] ${carta.name}: você perdeu 2 PC.`, '#c84d2a');
+      } else if (behaviors.includes('return_to_hand')) {
+        setCampoJogador(prev => {
+          const personagens = [...prev.personagens];
+          const idx = personagens
+            .map((c, i) => ({ c, i })).filter(({ c }) => c)
+            .sort((a, b) => (b.c.atk ?? 0) - (a.c.atk ?? 0))[0]?.i;
+          if (idx !== undefined) {
+            addLog(`[PLANTA] ${carta.name}: devolveu ${personagens[idx].name} à mão adversária.`, '#8ac46a');
+            personagens[idx] = null;
+          }
+          return { ...prev, personagens };
+        });
+      } else {
+        addLog(`[PLANTA] ${carta.name}: efeito ativado.`, '#8ac46a');
+      }
+    };
+
     // Cópias de trabalho — evita stale closure após awaits
     let workMao   = [...maoNpc];
     let workDeck  = [...deckNpc];
@@ -438,24 +541,29 @@ export function useBattleState(npc) {
         setMaoNpc([...workMao]);
         setEsquecimentoNpc([...workEsq]);
         setCampoNpc({ ...workCampo, folcloricas: [...workCampo.folcloricas] });
+        executarEfeitoFolcloricaNpc(folc);
       }
     }
 
-    // 6. Jogar planta — entra oculta exceto instantâneas (regra 35.0)
+    // 6. Jogar planta — preferir instantânea (revela + ativa efeito), senão oculta (regra 35.0)
     await delay(800);
     if (!flags.jogouPlanta) {
-      const mi = workMao.findIndex(c => isPlanta(c));
       const si = workCampo.plantas.indexOf(null);
-      if (mi !== -1 && si !== -1) {
-        const raw = workMao[mi];
-        const oculta = !isInstantanea(raw);
-        const carta = { ...raw, oculta };
-        workMao.splice(mi, 1);
-        workCampo.plantas[si] = carta;
-        flags.jogouPlanta = true;
-        setMaoNpc([...workMao]);
-        setCampoNpc({ ...workCampo, plantas: [...workCampo.plantas] });
-        addLog(`[NPC] Jogou ${oculta ? 'uma planta' : carta.name} em campo`, '#8ac46a');
+      if (si !== -1) {
+        const instMi = workMao.findIndex(c => isPlanta(c) && isInstantanea(c));
+        const mi = instMi !== -1 ? instMi : workMao.findIndex(c => isPlanta(c));
+        if (mi !== -1) {
+          const raw = workMao[mi];
+          const oculta = instMi === -1;
+          const carta = { ...raw, oculta, entrou_turno_atual: true };
+          workMao.splice(mi, 1);
+          workCampo.plantas[si] = carta;
+          flags.jogouPlanta = true;
+          setMaoNpc([...workMao]);
+          setCampoNpc({ ...workCampo, plantas: [...workCampo.plantas] });
+          addLog(`[NPC] Jogou ${oculta ? 'uma planta' : carta.name} em campo`, '#8ac46a');
+          if (!oculta) executarEfeitoPlantaNpc(carta);
+        }
       }
     }
 
@@ -491,15 +599,32 @@ export function useBattleState(npc) {
       }
     }
 
-    // 8. Passar vez — resetar entrou_turno_atual e regenerar DEF do NPC
+    // 8. Passar vez — ativar plantas de espera, resetar entrou_turno_atual e regenerar DEF do NPC
     await delay(800);
+
+    // Ativar plantas de espera que aguardaram 1 turno (oculta + !entrou_turno_atual + isEspera)
+    workCampo.plantas = workCampo.plantas.map(p => {
+      if (p && p.oculta && !p.entrou_turno_atual && isEspera(p)) {
+        addLog(`[PLANTA] ${p.name} revelada e ativada (Espera)`, '#8ac46a');
+        executarEfeitoPlantaNpc(p);
+        return { ...p, oculta: false };
+      }
+      return p;
+    });
+
     workCampo.personagens = workCampo.personagens.map(c => c ? {
       ...c,
       entrou_turno_atual: false,
       defAtual: c.defBase ?? c.def ?? 0,
       defReduzidaTurno: false,
     } : null);
-    setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
+
+    // Resetar entrou_turno_atual nas plantas para permitir ativação de espera no próximo turno
+    workCampo.plantas = workCampo.plantas.map(p =>
+      p && p.entrou_turno_atual ? { ...p, entrou_turno_atual: false } : p
+    );
+
+    setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);

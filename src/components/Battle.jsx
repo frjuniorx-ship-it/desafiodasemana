@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
-import { LIMITE_TURNO } from '../engine/rules.js';
+import { LIMITE_TURNO, temKeyword, KEYWORDS } from '../engine/rules.js';
 import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -129,8 +129,13 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'atacar': {
         const cartaNome = resultado.carta
-          || campoJogador.personagens.find(c => c && !c.entrou_turno_atual)?.name;
+          || campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)))?.name;
         if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
+        const cartaAtacante = campoJogador.personagens.find(c => c && normStr(c.name) === normStr(cartaNome));
+        if (cartaAtacante?.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
+          addChatMsg('ai', `${cartaAtacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
+          break;
+        }
         const r = jogadorAtacar(cartaNome, resultado.alvo);
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${r.atacanteNome ?? cartaNome} em ${r.alvoNome ?? resultado.alvo}.` : r.msg }]);
         break;
@@ -142,8 +147,12 @@ export default function Battle({ npc, onGameOver, token }) {
               const sim = Math.max(similaridade(resultado.carta, c.name), normStr(c.name).includes(normStr(resultado.carta)) ? 1 : 0);
               return sim > (best?.sim ?? 0) ? { c, sim } : best;
             }, null)?.c
-          : campoJogador.personagens.find(c => c && !c.entrou_turno_atual);
+          : campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado);
         if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
+        if (atacante.entrou_turno_atual && !temKeyword(atacante, KEYWORDS.INVESTIR)) {
+          addChatMsg('ai', `${atacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
+          break;
+        }
         const r = jogadorAtaqueDireto(atacante.name);
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
         break;
