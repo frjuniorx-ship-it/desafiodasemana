@@ -193,7 +193,7 @@ export const EFEITOS_NEGATIVOS = [
 // DESCARTE — pode vir da mão E/OU do campo (clarificação oficial)
 // Restrições: carta sob efeito negativo, carta com magia/ação de turno ativa
 export function podeSerDescartada(carta) {
-  if (carta.paralisada) return false;
+  if (carta.paralisado) return false;
   if (carta.sob_efeito_adversario) return false;
   if (carta.acao_turno_ativa) return false;
   return true;
@@ -202,7 +202,7 @@ export function podeSerDescartada(carta) {
 // SUBSTITUIÇÃO (regra 15.0)
 // Só quando área está cheia. Não pode substituir carta sob efeito negativo.
 export function podeSubstituir(carta) {
-  return !carta.paralisada && !carta.arruinada && !carta.imobilizada;
+  return !carta.paralisado && !carta.arruinada && !carta.imobilizado;
 }
 
 // REGENERAÇÃO DE DEF (FAQ livro de regras)

@@ -1220,7 +1220,8 @@ export function useBattleState(npc) {
     if (!temVeneno) {
       const atkD = defensoraCard.atk ?? 0;
       const defA = atacanteCard.defAtual ?? atacanteCard.def ?? 0;
-      const atacanteDestruido = atkD >= defA;
+      const temIgnorar = temKeyword(atacanteCard, KEYWORDS.IGNORAR);
+      const atacanteDestruido = !temIgnorar && atkD >= defA;
       if (atacanteDestruido) {
         const pcPerdido = pcPerdidoPorDestruicao(atacanteCard);
         if (npcAtaca) {

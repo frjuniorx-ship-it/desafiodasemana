@@ -87,12 +87,12 @@ export default function CharSlot({ card, side, selected, attacking, selectable, 
             <div style={{ flex: 1, background: 'rgba(180,40,30,.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#ffc8c8', fontWeight: 900, lineHeight: 1 }}>{card.defAtual ?? card.def ?? 0}</span>
             </div>
-            {card.paralisada && (
+            {card.paralisado && (
               <div style={{ flex: 1, background: 'rgba(60,80,200,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#c8d0ff', fontWeight: 700 }}>PAR</span>
               </div>
             )}
-            {card.imobilizada && (
+            {card.imobilizado && (
               <div style={{ flex: 1, background: 'rgba(90,20,160,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 6, color: '#d0b0ff', fontWeight: 700 }}>IMO</span>
               </div>
