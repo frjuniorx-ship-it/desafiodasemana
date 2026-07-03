@@ -32,6 +32,22 @@ export function inicializarCacheCartas(cartas) {
   if (Array.isArray(cartas) && cartas.length > 0) _cartasCache = cartas;
 }
 
+export function getCacheSize() { return _cartasCache.length; }
+
+// Nomes de folclóricas já normalizados (sem acento, sem hífen, minúsculas)
+const FOLCLORICAS_CONHECIDAS_NORM = [
+  'boitata', 'quibungo', 'gorjala', 'pisadeira', 'saci', 'curupira',
+  'iara', 'uirapuru', 'mao de cabelo', 'anhanga', 'cuca', 'lobisomem',
+  'besta fera', 'vitoria regia', 'homem do saco', 'mula sem cabeca',
+  'batatao', 'passaro fogo', 'barba ruiva',
+];
+
+function ehFolcloricaConhecida(texto) {
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/-/g, ' ');
+  const t = norm(texto);
+  return FOLCLORICAS_CONHECIDAS_NORM.some(f => t.includes(f) || f.includes(t));
+}
+
 function extrairNomeCarta(t) {
   return t.split(' ').filter(w => w.length > 1 && !STOP_WORDS.has(w)).join(' ').trim();
 }
@@ -217,7 +233,11 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   // JOGAR CARTA (padrão genérico com verbos expandidos — por último)
   const mJogar = t.match(/(?:jog(?:o|uei|ar)|baix(?:o|ei)|coloc[ao]|ponho|poe|desc(?:o|i)|entr(?:a|ou)|us(?:o|ei)|ativ(?:o|ei)|adiciono|boto|bota)\s+(?:o\s+|a\s+|um(?:a)?\s+)?(.+)/);
   if (mJogar) {
-    return { acao: 'jogar_carta', carta: limpar(mJogar[1]), ...(zonaTexto ? { zona: zonaTexto } : {}) };
+    const cartaNome = limpar(mJogar[1]);
+    if (ehFolcloricaConhecida(cartaNome)) {
+      return { acao: 'iniciar_folclorica', carta: cartaNome };
+    }
+    return { acao: 'jogar_carta', carta: cartaNome, ...(zonaTexto ? { zona: zonaTexto } : {}) };
   }
 
   // REMOVER/SUBSTITUIR

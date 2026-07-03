@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
 import { LIMITE_TURNO, temKeyword, KEYWORDS, COMPRA_MAO_VAZIA } from '../engine/rules.js';
-import { processarAcaoBatalha, gerarDicaContextual, inicializarCacheCartas } from '../api/battleAI.js';
+import { processarAcaoBatalha, gerarDicaContextual, inicializarCacheCartas, getCacheSize } from '../api/battleAI.js';
 import { getCartas } from '../api/cartas.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -299,20 +299,23 @@ export default function Battle({ npc, onGameOver, token }) {
       case 'iniciar_folclorica': {
         if (!validarLimiteTurno('folclorica')) break;
         if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
+        console.log('[FOLCLORICA] iniciando:', resultado.carta, '| cache size:', getCacheSize());
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
           else if (r.precisaDescarte) {
             const maoAtual = narracaoJogador.maoDeclarada;
             let msg;
             if (maoAtual !== null && maoAtual < r.nd) {
-              msg = `${r.carta.name} exige ${r.nd} descarte(s), mas você declarou ter ${maoAtual} carta(s) na mão. Se alguma das cartas de descarte estiver em campo, pode incluí-la. Diga quais cartas você descartou (da mão e/ou do campo).`;
+              msg = `${r.carta.name} exige descarte de ${r.nd} carta(s), mas você declarou ter ${maoAtual} carta(s) na mão. Pode incluir cartas do campo também. Diga quais cartas você está descartando. Ex: "descarto [carta A] e [carta B]"`;
             } else {
-              const maoStr = maoAtual !== null ? ` Você tem ${maoAtual} carta(s) na mão.` : '';
-              msg = `${r.carta.name} requer ${r.nd} descarte(s).${maoStr} Quais cartas você descartou? Diga "descarto [carta1], [carta2]…"`;
+              msg = `${r.carta.name} exige descarte de ${r.nd} carta(s). Diga quais cartas você está descartando. Pode ser da mão ou do campo. Ex: "descarto [carta A] e [carta B]"`;
             }
-            setChat(prev => [...prev, { kind: 'ia', text: msg }]);
+            addChatMsg('ia', msg);
           }
-          else setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
+          else {
+            setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
+            setAcoesRapidas([]);
+          }
         });
         break;
       }
