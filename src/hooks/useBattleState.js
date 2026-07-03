@@ -364,9 +364,21 @@ export function useBattleState(npc) {
       const slug = folc.slug || '';
       if (slug === 'boitata') {
         setCampoJogador(prev => {
-          const names = prev.personagens.filter(Boolean).map(c => c.name);
-          if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${names.join(', ')} do seu campo.`, '#c84d2a');
-          return { ...prev, personagens: prev.personagens.map(() => null) };
+          const tudo = [
+            ...prev.personagens.filter(Boolean).map(c => c.name),
+            ...prev.plantas.filter(c => c && c.name !== '???').map(c => c.name),
+            ...(prev.folcloricas || []).map(c => c.name),
+            ...(prev.acao ? [prev.acao.name] : []),
+          ];
+          if (tudo.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu campo inteiro — ${tudo.join(', ')}.`, '#c84d2a');
+          else addLog(`[FOLCLÓRICA] ${folc.name}: campo já estava vazio.`, '#c84d2a');
+          return {
+            ...prev,
+            personagens: prev.personagens.map(() => null),
+            plantas: prev.plantas.map(() => null),
+            folcloricas: [],
+            acao: null,
+          };
         });
       } else if (slug === 'mao-de-cabelo') {
         setCampoJogador(prev => {
@@ -812,9 +824,21 @@ export function useBattleState(npc) {
 
     if (slug === 'boitata') {
       setCampoNpc(prev => {
-        const names = prev.personagens.filter(Boolean).map(c => c.name);
-        if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${names.join(', ')} do campo do NPC.`, '#c89b3c');
-        return { ...prev, personagens: prev.personagens.map(() => null) };
+        const tudo = [
+          ...prev.personagens.filter(Boolean).map(c => c.name),
+          ...prev.plantas.filter(c => c && c.name !== '???').map(c => c.name),
+          ...(prev.folcloricas || []).map(c => c.name),
+          ...(prev.acao ? [prev.acao.name] : []),
+        ];
+        if (tudo.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu campo inteiro do NPC — ${tudo.join(', ')}.`, '#c89b3c');
+        else addLog(`[FOLCLÓRICA] ${folc.name}: campo do NPC estava vazio.`, '#c89b3c');
+        return {
+          ...prev,
+          personagens: prev.personagens.map(() => null),
+          plantas: prev.plantas.map(() => null),
+          folcloricas: [],
+          acao: null,
+        };
       });
       return;
     }

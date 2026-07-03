@@ -1,4 +1,4 @@
-export default function CharSlot({ card, side, selected, attacking, onZoom, onZoomOut }) {
+export default function CharSlot({ card, side, selected, attacking, selectable, onSelect, onZoom, onZoomOut }) {
   const filled = !!card;
   const accentColor = side === 'npc' ? '#c84d2a' : '#5a8a4a';
   const portraitLight = side === 'npc' ? '#5a2a1a' : '#3a5a2a';
@@ -17,19 +17,27 @@ export default function CharSlot({ card, side, selected, attacking, onZoom, onZo
     border = '1.5px solid #f5d27a';
     boxShadow = '0 0 14px rgba(245,210,122,.5), inset 0 0 10px rgba(212,168,87,.2)';
   }
+  if (selectable && filled) {
+    border = '2px solid #f5d27a';
+    boxShadow = '0 0 20px rgba(245,210,122,.8), 0 0 8px rgba(245,210,122,.5), inset 0 0 12px rgba(212,168,87,.3)';
+    background = side === 'npc' ? 'linear-gradient(180deg, #3a2010, #221212)' : background;
+  }
 
   const initial = card ? (card.name[0] || '?').toUpperCase() : '';
 
   return (
     <div
-      onClick={() => filled && onZoom && onZoom(card)}
+      onClick={() => {
+        if (filled && selectable && onSelect) { onSelect(card); return; }
+        if (filled && onZoom) onZoom(card);
+      }}
       onMouseEnter={() => filled && onZoom && onZoom(card)}
       onMouseLeave={() => onZoomOut && onZoomOut()}
       style={{
         position: 'relative', width: '100%', height: '100%', borderRadius: 6,
         border, background, boxShadow,
         overflow: 'hidden',
-        cursor: filled ? 'pointer' : 'default',
+        cursor: selectable && filled ? 'crosshair' : filled ? 'pointer' : 'default',
         transition: 'transform .15s, filter .15s',
       }}
       onMouseOver={e => { if (filled) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.filter = 'brightness(1.1)'; }}}

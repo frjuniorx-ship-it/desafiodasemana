@@ -41,6 +41,7 @@ export default function Battle({ npc, onGameOver, token }) {
   const [micAtivo, setMicAtivo] = useState(false);
   const [toast, setToast] = useState('');
   const [acoesRapidas, setAcoesRapidas] = useState([]);
+  const [selecaoAlvo, setSelecaoAlvo] = useState(null); // null | { atacanteCard }
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
   const sendChatRef = useRef(null);
@@ -84,6 +85,18 @@ export default function Battle({ npc, onGameOver, token }) {
 
   const addQuickMsg = (kind, text) => setChat(prev => [...prev, { kind, text }]);
 
+  function handleSelectAlvo(alvoCard) {
+    if (!selecaoAlvo) return;
+    const { atacanteCard } = selecaoAlvo;
+    setSelecaoAlvo(null);
+    resolverCombateCompleto(atacanteCard, alvoCard, false);
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, atacouNesteTurno: true } : c),
+    }));
+    setChat(prev => [...prev, { kind: 'system', text: `Ataque de ${atacanteCard.name} em ${alvoCard.name}.` }]);
+  }
+
   function sendChat(textoOverride) {
     const text = (typeof textoOverride === 'string' ? textoOverride : inputVal).trim();
     if (!text) return;
@@ -121,6 +134,8 @@ export default function Battle({ npc, onGameOver, token }) {
       }));
       return true;
     }
+
+    if (selecaoAlvo) setSelecaoAlvo(null);
 
     const curupiraAtivo = (campoNpc.efeitosGlobais || []).some(e => e.tipo === 'curupira');
     const estado = { turno, nomeNpc: npcName, pcNpc, pcJogador, campoNpc, campoJogador, combatePendente };
@@ -191,8 +206,27 @@ export default function Battle({ npc, onGameOver, token }) {
           break;
         }
         const cartaAtacante = buscarNoCampo(campoJogador.personagens, resultado.carta);
-        if (cartaAtacante?.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
+        if (!cartaAtacante) { addChatMsg('ia', `"${resultado.carta}" não está no seu campo.`); break; }
+        if (cartaAtacante.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
           addChatMsg('ai', `${cartaAtacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
+          break;
+        }
+        if (cartaAtacante.atacouNesteTurno) {
+          addChatMsg('ai', `${cartaAtacante.name} já atacou neste turno (regra 26.0).`);
+          break;
+        }
+        // Detectar alvo ausente ou ambíguo no campo do NPC
+        const npcPersonagens = campoNpc.personagens.filter(Boolean);
+        if (!resultado.alvo || npcPersonagens.length === 0) {
+          if (npcPersonagens.length === 0) { addChatMsg('ia', 'Campo do NPC sem personagens — use "ataco direto com [carta]".'); break; }
+          addChatMsg('ia', `${cartaAtacante.name} pronto! Clique na carta do NPC que quer atacar.`);
+          setSelecaoAlvo({ atacanteCard: cartaAtacante });
+          break;
+        }
+        const candidatos = npcPersonagens.filter(c => similaridade(normStr(c.name), normStr(resultado.alvo)) >= 0.4);
+        if (candidatos.length > 1) {
+          addChatMsg('ia', `Há ${candidatos.length} cartas com esse nome em campo — clique na que quer atacar.`);
+          setSelecaoAlvo({ atacanteCard: cartaAtacante });
           break;
         }
         const r = jogadorAtacar(resultado.carta, resultado.alvo);
@@ -264,7 +298,17 @@ export default function Battle({ npc, onGameOver, token }) {
         if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
-          else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ia', text: `${r.carta.name} requer ${r.nd} descarte(s). Quais cartas você descartou? Diga "descarto [cartas]" para registrar no esquecimento e ativar a carta.` }]);
+          else if (r.precisaDescarte) {
+            const maoAtual = narracaoJogador.maoDeclarada;
+            let msg;
+            if (maoAtual !== null && maoAtual < r.nd) {
+              msg = `${r.carta.name} exige ${r.nd} descarte(s), mas você declarou ter ${maoAtual} carta(s) na mão. Se alguma das cartas de descarte estiver em campo, pode incluí-la. Diga quais cartas você descartou (da mão e/ou do campo).`;
+            } else {
+              const maoStr = maoAtual !== null ? ` Você tem ${maoAtual} carta(s) na mão.` : '';
+              msg = `${r.carta.name} requer ${r.nd} descarte(s).${maoStr} Quais cartas você descartou? Diga "descarto [carta1], [carta2]…"`;
+            }
+            setChat(prev => [...prev, { kind: 'ia', text: msg }]);
+          }
           else setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
         });
         break;
@@ -539,7 +583,10 @@ export default function Battle({ npc, onGameOver, token }) {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                   {campoNpc.personagens.map((carta, i) => (
-                    <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
+                    <CharSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom}
+                      selectable={!!selecaoAlvo && !!carta}
+                      onSelect={selecaoAlvo ? handleSelectAlvo : undefined}
+                    />
                   ))}
                 </div>
               </div>
@@ -634,6 +681,19 @@ export default function Battle({ npc, onGameOver, token }) {
               <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {chat.map((m, i) => <ChatBubble key={i} msg={m} />)}
               </div>
+              {selecaoAlvo && (
+                <div style={{ display: 'flex', gap: 6, padding: '6px 8px', flexShrink: 0, borderTop: '1px solid rgba(245,210,122,.25)', background: 'rgba(245,210,122,.06)', alignItems: 'center' }}>
+                  <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, color: '#f5d27a', letterSpacing: '.12em', flex: 1 }}>
+                    🎯 CLIQUE NO ALVO NO CAMPO DO NPC
+                  </div>
+                  <button
+                    onClick={() => setSelecaoAlvo(null)}
+                    style={{ padding: '4px 10px', borderRadius: 5, fontSize: 9, cursor: 'pointer', fontFamily: "'Cinzel', serif", letterSpacing: '.1em', background: 'rgba(200,77,42,.2)', border: '1px solid #c84d2a', color: '#c84d2a' }}
+                  >
+                    CANCELAR
+                  </button>
+                </div>
+              )}
               {acoesRapidas.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, padding: '4px 8px', flexWrap: 'wrap', flexShrink: 0, borderTop: '1px solid rgba(212,168,87,.1)' }}>
                   <button
