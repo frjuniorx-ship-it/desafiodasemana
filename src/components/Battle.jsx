@@ -208,7 +208,7 @@ export default function Battle({ npc, onGameOver, token }) {
         jogadorRevelarPlanta(resultado.carta, resultado.slot).then(r => {
           if (r.ok) {
             setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} revelada em campo.` }]);
-            jogadorExecutarEfeitoPlanta(r.carta, !!combatePendente);
+            jogadorExecutarEfeitoPlanta(r.carta, !!combatePendente, combatePendente);
           } else {
             setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
           }

@@ -327,7 +327,21 @@ export function useBattleState(npc) {
           addLog(`[EFEITO] O Homem do Saco: -${e.pcPorTurno} PC`);
         }
       });
+      // Efeitos globais do jogador (ex: O Homem do Saco jogado pelo jogador → drena PC do NPC)
+      const globaisJogador = campoJogador.efeitosGlobais || [];
+      globaisJogador.forEach(e => {
+        if (e.tipo === 'homem_do_saco') {
+          setPcNpc(prev => Math.max(0, prev - e.pcPorTurno));
+          addLog(`[EFEITO] O Homem do Saco: NPC -${e.pcPorTurno} PC`, '#c89b3c');
+        }
+      });
       setCampoNpc(prev => ({
+        ...prev,
+        efeitosGlobais: (prev.efeitosGlobais || [])
+          .map(e => ({ ...e, turnos: e.turnos - 1 }))
+          .filter(e => e.turnos > 0),
+      }));
+      setCampoJogador(prev => ({
         ...prev,
         efeitosGlobais: (prev.efeitosGlobais || [])
           .map(e => ({ ...e, turnos: e.turnos - 1 }))
@@ -343,7 +357,21 @@ export function useBattleState(npc) {
     const executarEfeitoFolcloricaNpc = (folc) => {
       const behaviors = getBehaviors(folc);
       const slug = folc.slug || '';
-      if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
+      if (slug === 'boitata') {
+        setCampoJogador(prev => {
+          const names = prev.personagens.filter(Boolean).map(c => c.name);
+          if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${names.join(', ')} do seu campo.`, '#c84d2a');
+          return { ...prev, personagens: prev.personagens.map(() => null) };
+        });
+      } else if (slug === 'mao-de-cabelo') {
+        setCampoJogador(prev => {
+          const personagens = prev.personagens.map(c => {
+            if (c?.atacouNesteTurno) { addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${c.name} que atacou.`, '#c84d2a'); return null; }
+            return c;
+          });
+          return { ...prev, personagens };
+        });
+      } else if (behaviors.includes('remove_card') && slug !== 'iara') {
         setCampoJogador(prev => {
           const personagens = [...prev.personagens];
           const idx = personagens.findIndex(Boolean);
@@ -366,6 +394,12 @@ export function useBattleState(npc) {
           const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
           addLog(`[FOLCLÓRICA] ${folc.name}: paralisou seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
+        });
+      } else if (slug === 'batatao' || slug === 'batata') {
+        setCampoJogador(prev => {
+          const names = prev.personagens.filter(Boolean).map(c => c.name);
+          if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${names.join(', ')} à sua mão.`, '#c84d2a');
+          return { ...prev, personagens: prev.personagens.map(() => null) };
         });
       } else if (behaviors.includes('return_to_hand')) {
         setCampoJogador(prev => {
@@ -712,7 +746,57 @@ export function useBattleState(npc) {
       b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
     ).filter(Boolean) ?? [];
 
-    if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
+    if (slug === 'boitata') {
+      setCampoNpc(prev => {
+        const names = prev.personagens.filter(Boolean).map(c => c.name);
+        if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${names.join(', ')} do campo do NPC.`, '#c89b3c');
+        return { ...prev, personagens: prev.personagens.map(() => null) };
+      });
+      return;
+    }
+    if (slug === 'labatut') {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens.findIndex(c => c && normStr(c.category).includes('histor'));
+        if (idx !== -1) {
+          addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${personagens[idx].name} (Histórica) do campo do NPC.`, '#c89b3c');
+          personagens[idx] = null;
+        } else { addLog(`[FOLCLÓRICA] ${folc.name}: nenhuma carta histórica em campo do NPC.`, '#c89b3c'); }
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'arranca-linguas') {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens.findIndex(c => c && normStr(c.category).includes('fera'));
+        if (idx !== -1) {
+          addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${personagens[idx].name} (Fera) do campo do NPC.`, '#c89b3c');
+          personagens[idx] = null;
+        } else { addLog(`[FOLCLÓRICA] ${folc.name}: nenhuma fera em campo do NPC.`, '#c89b3c'); }
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'mao-de-cabelo') {
+      setCampoNpc(prev => {
+        const personagens = prev.personagens.map(c => {
+          if (c?.atacouNesteTurno) { addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${c.name} que atacou.`, '#c89b3c'); return null; }
+          return c;
+        });
+        return { ...prev, personagens };
+      });
+      return;
+    }
+    if (slug === 'o-homem-do-saco') {
+      setCampoJogador(prev => ({
+        ...prev,
+        efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'homem_do_saco', turnos: 5, pcPorTurno: 1 }],
+      }));
+      addLog('[EFEITO] O Homem do Saco: NPC perde 1 PC por turno durante 5 turnos.', '#c89b3c');
+      return;
+    }
+    if (behaviors.includes('remove_card') && slug !== 'iara') {
       setCampoNpc(prev => {
         const personagens = [...prev.personagens];
         const idx = personagens.findIndex(Boolean);
@@ -725,7 +809,8 @@ export function useBattleState(npc) {
       return;
     }
     if (slug === 'quibungo' || behaviors.includes('discard_cards')) {
-      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'efeito de descarte ativado'}.`, '#c89b3c');
+      setMaoNpc([]);
+      addLog(`[FOLCLÓRICA] ${folc.name}: descartou toda a mão do NPC.`, '#c89b3c');
       return;
     }
     if ((behaviors.includes('modify_stats') && !behaviors.includes('apply_status')) || slug === 'gorjala') {
@@ -744,7 +829,15 @@ export function useBattleState(npc) {
       });
       return;
     }
-    if (behaviors.includes('return_to_hand') || slug === 'batata' || slug === 'caboclo-dagua') {
+    if (slug === 'batatao' || slug === 'batata') {
+      setCampoNpc(prev => {
+        const names = prev.personagens.filter(Boolean).map(c => c.name);
+        if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${names.join(', ')} à mão do NPC.`, '#c89b3c');
+        return { ...prev, personagens: prev.personagens.map(() => null) };
+      });
+      return;
+    }
+    if (behaviors.includes('return_to_hand') || slug === 'caboclo-dagua') {
       setCampoNpc(prev => {
         const personagens = [...prev.personagens];
         const idx = personagens
@@ -782,7 +875,7 @@ export function useBattleState(npc) {
     addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
   }, [campoNpc]);
 
-  const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false) => {
+  const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false, pendente = null) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
     const behaviors = carta.effect_blocks?.flatMap(b =>
@@ -816,6 +909,65 @@ export function useBattleState(npc) {
         }
         return { ...prev, personagens };
       });
+    } else if (carta.slug === 'guerra-de-mamonas') {
+      setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(() => null) }));
+      setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(() => null) }));
+      addLog(`[PLANTA] ${carta.name}: todos os personagens de ambos os campos foram removidos.`, '#8ac46a');
+    } else if (carta.slug === 'armadilha-mortal' && pendente) {
+      const atacanteNome = pendente.atacanteNome;
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c?.name === atacanteNome
+          ? { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 2 }] }
+          : c),
+      }));
+      addLog(`[PLANTA] ${carta.name}: ${atacanteNome} paralisado por 2 turnos!`, '#8ac46a');
+    } else if (carta.slug === 'veneno-de-tinhorao') {
+      if (emResposta && pendente) {
+        const atacanteNome = pendente.atacanteNome;
+        setCampoNpc(prev => ({
+          ...prev,
+          personagens: prev.personagens.map(c => c?.name === atacanteNome
+            ? { ...c, def: Math.max(0, (c.def ?? 0) - 1) } : c),
+        }));
+        addLog(`[PLANTA] ${carta.name}: reduziu -0/-1 de ${atacanteNome}.`, '#8ac46a');
+      } else {
+        setPcNpc(p => Math.max(0, p - 1));
+        addLog(`[PLANTA] ${carta.name}: NPC perdeu 1 PC.`, '#8ac46a');
+      }
+    } else if (carta.slug === 'arvore-sagrada-do-sertao') {
+      setPcJogador(p => p + 3);
+      addLog(`[PLANTA] ${carta.name}: você ganhou 3 PC.`, '#8ac46a');
+    } else if (carta.slug === 'encanto-do-jacaranda') {
+      setCampoJogador(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, paralisado: false, imobilizado: false } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: seus personagens foram curados de efeitos negativos.`, '#8ac46a');
+    } else if (carta.slug === 'renovacao-de-pinhas') {
+      setCampoNpc(prev => {
+        const personagens = [...prev.personagens];
+        const plantas = [...prev.plantas];
+        const pIdx = personagens.findIndex(Boolean);
+        if (pIdx !== -1) {
+          addLog(`[PLANTA] ${carta.name}: devolveu ${personagens[pIdx].name} à mão do NPC.`, '#8ac46a');
+          personagens[pIdx] = null;
+          return { ...prev, personagens };
+        }
+        const plIdx = plantas.findIndex(Boolean);
+        if (plIdx !== -1) {
+          addLog(`[PLANTA] ${carta.name}: devolveu planta do NPC para a mão.`, '#8ac46a');
+          plantas[plIdx] = null;
+          return { ...prev, plantas };
+        }
+        return prev;
+      });
+    } else if (carta.slug === 'seiva-do-mangue-preto') {
+      setCampoJogador(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, paralisado: false } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: seus personagens paralisados foram curados.`, '#8ac46a');
     } else if (behaviors.includes('remove_card')) {
       setCampoNpc(prev => {
         const personagens = [...prev.personagens];
@@ -826,6 +978,24 @@ export function useBattleState(npc) {
         }
         return { ...prev, personagens };
       });
+    } else if (behaviors.includes('apply_status')) {
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: paralisou personagens do NPC.`, '#8ac46a');
+    } else if (behaviors.includes('modify_stats')) {
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: -2/-2 em personagens do NPC.`, '#8ac46a');
+    } else if (behaviors.includes('swap_stats')) {
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c ? { ...c, atk: c.def ?? 0, def: c.atk ?? 0, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'uirapuru', turnos: 2 }] } : null),
+      }));
+      addLog(`[PLANTA] ${carta.name}: trocou ATQ e DEF dos personagens do NPC.`, '#8ac46a');
     } else {
       addLog(`[PLANTA] ${carta.name}: ${carta.magia || carta.combo_habilidade || 'efeito ativado'}.`, '#8ac46a');
     }
