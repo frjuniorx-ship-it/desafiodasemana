@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
-import { LIMITE_TURNO, temKeyword, KEYWORDS } from '../engine/rules.js';
+import { LIMITE_TURNO, temKeyword, KEYWORDS, COMPRA_MAO_VAZIA } from '../engine/rules.js';
 import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
@@ -43,6 +43,7 @@ export default function Battle({ npc, onGameOver, token }) {
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
   const sendChatRef = useRef(null);
+  const prevVezDoNpcRef = useRef(null);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -51,6 +52,20 @@ export default function Battle({ npc, onGameOver, token }) {
   useEffect(() => {
     setAcoesRapidas(combatePendente ? ['confirmar_combate', 'passar_vez'] : []);
   }, [combatePendente]);
+
+  // Prompt de início de turno do jogador
+  useEffect(() => {
+    if (!prontoParaJogar) { prevVezDoNpcRef.current = vezDoNpc; return; }
+    if (prevVezDoNpcRef.current === true && !vezDoNpc) {
+      const maoFim = narracaoJogador.maoFinalTurnoAnterior;
+      if (maoFim === 0) {
+        setChat(prev => [...prev, { kind: 'ia', text: `Sua vez! Você terminou sem cartas na mão — compre ${COMPRA_MAO_VAZIA} cartas (regra 11.0). Diga "comprei ${COMPRA_MAO_VAZIA} cartas".` }]);
+      } else {
+        setChat(prev => [...prev, { kind: 'ia', text: 'Sua vez! Não esqueça de comprar 1 carta. Diga "comprei 1 carta".' }]);
+      }
+    }
+    prevVezDoNpcRef.current = vezDoNpc;
+  }, [vezDoNpc, prontoParaJogar]);
 
   function zoomCard(card) {
     if (!card || card.name === '???') return;
@@ -232,7 +247,7 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!validarLimiteTurno('folclorica')) break;
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
-          else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ai', text: `${r.carta.name} requer ${r.nd} descarte(s). Diga: "descarto [carta] e ativo ${r.carta.name}".` }]);
+          else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ia', text: `${r.carta.name} requer ${r.nd} descarte(s). Quais cartas você descartou? Diga "descarto [cartas]" para registrar no esquecimento e ativar a carta.` }]);
           else setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
         });
         break;
@@ -241,8 +256,17 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!validarLimiteTurno('folclorica')) break;
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) { setChat(prev => [...prev, { kind: 'system', text: r.msg }]); return; }
-          const res = jogadorCompletarFolclorica(resultado.descarte ? [resultado.descarte] : []);
-          setChat(prev => [...prev, { kind: 'system', text: res.ok ? `${res.carta.name} ativado após descarte.` : res.msg }]);
+          const cartasList = resultado.descarte
+            ? resultado.descarte.split(/,|\s+e\s+/).map(s => s.trim()).filter(Boolean)
+            : [];
+          const res = jogadorCompletarFolclorica(cartasList);
+          if (res.ok) {
+            setChat(prev => [...prev, { kind: 'system', text: `${res.carta.name} ativado.` }]);
+            if (cartasList.length > 0)
+              addChatMsg('ia', `Registrei ${cartasList.join(', ')} no seu esquecimento.`);
+          } else {
+            setChat(prev => [...prev, { kind: 'system', text: res.msg }]);
+          }
         });
         break;
       }
@@ -260,7 +284,12 @@ export default function Battle({ npc, onGameOver, token }) {
         }
         const cartasList = cartasStr.split(/,|\s+e\s+/).map(s => s.trim()).filter(Boolean);
         const res = jogadorCompletarFolclorica(cartasList);
-        setChat(prev => [...prev, { kind: 'system', text: res.ok ? `${res.carta.name} ativado após descarte.` : res.msg }]);
+        if (res.ok) {
+          setChat(prev => [...prev, { kind: 'system', text: `${res.carta.name} ativado.` }]);
+          addChatMsg('ia', `Registrei ${cartasList.join(', ')} no seu esquecimento.`);
+        } else {
+          setChat(prev => [...prev, { kind: 'system', text: res.msg }]);
+        }
         break;
       }
       case 'declarar_compra': {
@@ -631,6 +660,9 @@ export default function Battle({ npc, onGameOver, token }) {
         <DiceModal onResult={(npcPrimeiro, logEntry) => {
           setChat(prev => [...prev, { kind: 'system', text: logEntry }]);
           iniciarJogo(npcPrimeiro);
+          if (!npcPrimeiro) {
+            setChat(prev => [...prev, { kind: 'ia', text: 'Você começa! No 1º turno não se compra carta (regra 10.0). Declare suas jogadas ou diga "passo".' }]);
+          }
         }} />
       )}
       {fimDeJogo && (
