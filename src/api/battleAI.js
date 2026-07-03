@@ -1,5 +1,78 @@
 import { normStr } from '../hooks/useBattleState.js';
 
+// ── Cache de cartas para classificação por tipo ─────────────────────────────
+function simBigramas(a, b) {
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return 1;
+  if (na.length < 2 || nb.length < 2) return 0;
+  const bgs = s => { const bg = new Set(); for (let i = 0; i < s.length - 1; i++) bg.add(s[i] + s[i + 1]); return bg; };
+  const bgA = bgs(na), bgB = bgs(nb);
+  let inter = 0; bgA.forEach(g => { if (bgB.has(g)) inter++; });
+  return (2 * inter) / (bgA.size + bgB.size);
+}
+
+const STOP_WORDS = new Set([
+  'jogo','joguei','jogar','baixo','baixei','coloco','coloquei','ponho','poe','boto','bota',
+  'desc','desci','entra','entrou','uso','usei','usar','ativo','ativei','ativar','adiciono',
+  'ataco','ataquei','ataque','atacando',
+  'equipo','equipei','equipar',
+  'revelo','revelei','revelar','revela','descubro','descobri',
+  'descarto','descartei','descartar',
+  'combino','combinei','combinar',
+  'o','a','os','as','um','uma','uns','umas','de','da','do','em','no','na','nos','nas',
+  'com','sem','para','pro','pra','por','pelo','pela','e','ou',
+  'campo','area','jogo','slot','posicao',
+  'direto','diretamente','primeiro','segundo','terceiro',
+]);
+
+let _cartasCache = [];
+
+export function inicializarCacheCartas(cartas) {
+  if (Array.isArray(cartas) && cartas.length > 0) _cartasCache = cartas;
+}
+
+function extrairNomeCarta(t) {
+  return t.split(' ').filter(w => w.length > 1 && !STOP_WORDS.has(w)).join(' ').trim();
+}
+
+function classificarPorTipo(carta) {
+  const cat = normStr(carta.categoria || carta.category || carta.tipo || '');
+  const cls = (carta.classe || carta.classes || []).map(c => normStr(c || ''));
+  if (cat.includes('folcl') || cls.some(c => c.includes('folcl'))) return 'folclorica';
+  if (cat.includes('planta') || cls.some(c => c === 'planta')) return 'planta';
+  if (cat.includes('equip') || cls.some(c => c.includes('equip'))) return 'equipamento';
+  if (cat.includes('personagem') || cls.some(c => c === 'personagem')) return 'personagem';
+  return 'desconhecido';
+}
+
+function buscarCartaNoCache(nome) {
+  if (!nome || _cartasCache.length === 0) return null;
+  const n = normStr(nome);
+  const nomeNorm = c => normStr(c.nome || c.name || '');
+  let found = _cartasCache.find(c => nomeNorm(c) === n);
+  if (found) return found;
+  const palavras = n.split(' ').filter(p => p.length > 2);
+  if (palavras.length > 0) {
+    found = _cartasCache.find(c => {
+      const cn = nomeNorm(c);
+      return palavras.filter(p => cn.includes(p)).length >= Math.min(2, palavras.length);
+    });
+    if (found) return found;
+  }
+  const longas = n.split(' ').filter(p => p.length >= 4);
+  if (longas.length > 0) {
+    found = _cartasCache.find(c => longas.some(p => nomeNorm(c).includes(p)));
+    if (found) return found;
+  }
+  let melhor = null, melhorSim = 0;
+  for (const c of _cartasCache) {
+    const sim = simBigramas(n, nomeNorm(c));
+    if (sim > melhorSim) { melhorSim = sim; melhor = c; }
+  }
+  return melhorSim >= 0.35 ? melhor : null;
+}
+
 // Parser local de ações — zero custo, zero chamadas externas
 export function processarAcaoBatalha(texto, estadoCampo) {
   const t = normStr(texto); // normaliza acentos, minúsculas, hífens→espaço
@@ -146,6 +219,21 @@ export function processarAcaoBatalha(texto, estadoCampo) {
   const mRemover = t.match(/(?:remov(?:o|i)|substitu(?:o|i)|troc(?:o|uei))\s+(?:o\s+|a\s+)?(.+)/);
   if (mRemover) {
     return { acao: 'remover', carta: limpar(mRemover[1]) };
+  }
+
+  // FALLBACK: extrai entidade pelo tipo quando nenhum padrão de verbo casou
+  if (_cartasCache.length > 0) {
+    const nomeExtraido = extrairNomeCarta(t);
+    if (nomeExtraido.length >= 3) {
+      const carta = buscarCartaNoCache(nomeExtraido);
+      if (carta) {
+        const nomeCarta = carta.nome || carta.name || nomeExtraido;
+        const tipo = classificarPorTipo(carta);
+        if (tipo === 'folclorica') return { acao: 'iniciar_folclorica', carta: nomeCarta };
+        if (tipo === 'planta')     return { acao: 'revelar_planta',     carta: nomeCarta };
+        return { acao: 'jogar_carta', carta: nomeCarta };
+      }
+    }
   }
 
   return null; // não reconheceu

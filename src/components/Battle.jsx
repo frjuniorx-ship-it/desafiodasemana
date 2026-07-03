@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { registrarResultado } from '../api/progresso.js';
 import { useBattleState, normStr, similaridade } from '../hooks/useBattleState.js';
 import { LIMITE_TURNO, temKeyword, KEYWORDS, COMPRA_MAO_VAZIA } from '../engine/rules.js';
-import { processarAcaoBatalha, gerarDicaContextual } from '../api/battleAI.js';
+import { processarAcaoBatalha, gerarDicaContextual, inicializarCacheCartas } from '../api/battleAI.js';
+import { getCartas } from '../api/cartas.js';
 import CharSlot from './battle/CharSlot';
 import PlantSlot from './battle/PlantSlot';
 import SmallSlot from './battle/SmallSlot';
@@ -44,6 +45,10 @@ export default function Battle({ npc, onGameOver, token }) {
   const recognitionRef = useRef(null);
   const sendChatRef = useRef(null);
   const prevVezDoNpcRef = useRef(null);
+
+  useEffect(() => {
+    getCartas().then(cartas => inicializarCacheCartas(cartas)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
