@@ -153,16 +153,18 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!narracaoJogador.compraDeclarada && narracaoJogador.turnoAtual > 1) {
           addChatMsg('ai', 'Você não declarou quantas cartas comprou nesse turno. Quantas cartas você comprou no início do turno?');
         }
-        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao, limitExceeded, tipo, limite }) => {
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao, limitExceeded, tipo, limite, equipadoEm, msg }) => {
           if (limitExceeded) {
             addChatMsg('ai', `Limite atingido: apenas ${limite} carta(s) do tipo "${tipo}" por turno (regra 20.0).`);
             return;
           }
           if (!carta) {
-            setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+            const texto = msg ?? (sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.`);
+            setChat(prev => [...prev, { kind: 'system', text: texto }]);
             return;
           }
-          setChat(prev => [...prev, { kind: 'system', text: `${carta.name} jogado em campo.` }]);
+          const texto = equipadoEm ? `${carta.name} equipado em ${equipadoEm}.` : `${carta.name} jogado em campo.`;
+          setChat(prev => [...prev, { kind: 'system', text: texto }]);
         });
         break;
       }

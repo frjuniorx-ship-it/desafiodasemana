@@ -1303,6 +1303,36 @@ export function useBattleState(npc) {
     if (atual >= limite) {
       return { carta: null, sugestao: null, limitExceeded: true, tipo, limite };
     }
+    // Equipamentos nunca entram em slot próprio — se anexam a personagem compatível no campo
+    if (isEquipamento(normalizada)) {
+      const alvo = campoJogador.personagens.find(c => c && podeEquipar(normalizada, c));
+      if (!alvo) {
+        return { carta: null, sugestao: null, msg: `Nenhum personagem compatível em campo para equipar ${normalizada.name}. Coloque um personagem compatível primeiro.` };
+      }
+      setNarracaoJogador(prev => ({
+        ...prev,
+        cartasJogadasNesteTurno: { ...prev.cartasJogadasNesteTurno, equipamento: (prev.cartasJogadasNesteTurno.equipamento || 0) + 1 },
+      }));
+      setCampoJogador(prev => {
+        const personagens = [...prev.personagens];
+        const idx = personagens.findIndex(c => c?.name === alvo.name);
+        if (idx === -1) return prev;
+        const a = personagens[idx];
+        personagens[idx] = {
+          ...a,
+          atkBase: a.atkBase ?? a.atk ?? 0,
+          defBase: a.defBase ?? a.def ?? 0,
+          atk: (a.atkBase ?? a.atk ?? 0) + (normalizada.atk ?? 0),
+          def: (a.defBase ?? a.def ?? 0) + (normalizada.def ?? 0),
+          pc: (a.pc ?? 0) + (normalizada.pc ?? 0),
+          effect_blocks: [...(a.effect_blocks ?? []), ...(normalizada.effect_blocks ?? [])],
+          equipamentos: [...(a.equipamentos ?? []), normalizada],
+        };
+        return { ...prev, personagens };
+      });
+      return { carta: normalizada, sugestao: null, equipadoEm: alvo.name };
+    }
+
     setNarracaoJogador(prev => ({
       ...prev,
       cartasJogadasNesteTurno: { ...prev.cartasJogadasNesteTurno, [tipo]: (prev.cartasJogadasNesteTurno[tipo] || 0) + 1 },
