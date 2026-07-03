@@ -175,16 +175,22 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'atacar': {
-        const cartaNome = resultado.carta
-          || campoJogador.personagens.find(c => c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado)?.name;
-        if (!cartaNome) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar.' }]); break; }
-        const cartaAtacante = buscarNoCampo(campoJogador.personagens, cartaNome);
+        if (!resultado.carta) {
+          const disponiveis = campoJogador.personagens.filter(c =>
+            c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado
+          );
+          if (!disponiveis.length) { addChatMsg('ia', 'Nenhuma carta disponível para atacar.'); break; }
+          const alvo = resultado.alvo || '[alvo]';
+          addChatMsg('ia', `Com qual carta você quer atacar ${alvo}? Diga "ataco ${alvo} com [nome]". Disponíveis: ${disponiveis.map(c => c.name).join(', ')}.`);
+          break;
+        }
+        const cartaAtacante = buscarNoCampo(campoJogador.personagens, resultado.carta);
         if (cartaAtacante?.entrou_turno_atual && !temKeyword(cartaAtacante, KEYWORDS.INVESTIR)) {
           addChatMsg('ai', `${cartaAtacante.name} entrou em campo neste turno e não pode atacar (regra 21.0).`);
           break;
         }
-        const r = jogadorAtacar(cartaNome, resultado.alvo);
-        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${r.atacanteNome ?? cartaNome} em ${r.alvoNome ?? resultado.alvo}.` : r.msg }]);
+        const r = jogadorAtacar(resultado.carta, resultado.alvo);
+        setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${r.atacanteNome ?? resultado.carta} em ${r.alvoNome ?? resultado.alvo}.` : r.msg }]);
         break;
       }
       case 'ataque_direto': {
@@ -198,14 +204,13 @@ export default function Battle({ npc, onGameOver, token }) {
         const candidatos = campoJogador.personagens.filter(c =>
           c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado && !c.atacouNesteTurno
         );
-        if (!resultado.carta && candidatos.length > 1) {
-          addChatMsg('ai', `Com qual personagem quer atacar direto? Diga "ataco direto com [nome]". Disponíveis: ${candidatos.map(c => c.name).join(', ')}.`);
+        if (!resultado.carta) {
+          if (!candidatos.length) { addChatMsg('ia', 'Nenhuma carta disponível para atacar direto.'); break; }
+          addChatMsg('ia', `Com qual carta você quer atacar direto ao PC? Diga "ataco direto com [nome]". Disponíveis: ${candidatos.map(c => c.name).join(', ')}.`);
           break;
         }
-        const atacante = resultado.carta
-          ? buscarNoCampo(campoJogador.personagens, resultado.carta)
-          : candidatos[0];
-        if (!atacante) { setChat(prev => [...prev, { kind: 'ai', text: 'Nenhuma carta disponível para atacar direto.' }]); break; }
+        const atacante = buscarNoCampo(campoJogador.personagens, resultado.carta);
+        if (!atacante) { addChatMsg('ia', `${resultado.carta} não está em campo ou não pode atacar. Disponíveis: ${candidatos.map(c => c.name).join(', ')}.`); break; }
         const r = jogadorAtaqueDireto(atacante.name);
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque direto! ${r.dano} de dano ao NPC.` : r.msg }]);
         break;
