@@ -103,6 +103,11 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'declarar_mao', quantidade: qtd };
   }
 
+  // DECLARAR DECK VAZIO — jogador perde no início do próximo turno (regra 4.0)
+  if (/(?:meu\s+baralho\s+zerou|nao\s+tenho\s+mais\s+cartas\s+(?:pra|para)\s+comprar|baralho\s+(?:vazio|zerou|acabou)|deck\s+(?:vazio|zerou|acabou)|sem\s+cartas\s+(?:pra|para)\s+comprar)/.test(t)) {
+    return { acao: 'declarar_deck_vazio' };
+  }
+
   // PASSAR VEZ
   if (/\b(passo|fim|termino|acabei|proximo turno|pass|nao tenho mais|sem jogada|finalizo)\b/.test(t)) {
     return { acao: 'passar_vez' };

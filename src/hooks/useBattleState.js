@@ -267,6 +267,7 @@ export function useBattleState(npc) {
     turnoAtual: 0,
     maoFinalTurnoAnterior: null,
   });
+  const [deckJogadorVazio, setDeckJogadorVazio] = useState(false);
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
   const campoJogadorRef = useRef(campoPadrao());
@@ -574,6 +575,14 @@ export function useBattleState(npc) {
       turnoAtual: prev.turnoAtual + 1,
     }));
 
+    // Derrota por baralho vazio do jogador (regra 4.0)
+    if (deckJogadorVazio) {
+      addLog('[FIM] Baralho do jogador está vazio — NPC venceu! (regra 4.0)', '#c84d2a');
+      setFimDeJogo('derrota');
+      setVezDoNpc(false);
+      return;
+    }
+
     // Regenerar DEF do campo do jogador e resetar flags de ataque e entrada (fim do turno do jogador)
     setCampoJogador(prev => ({
       ...prev,
@@ -795,7 +804,7 @@ export function useBattleState(npc) {
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
-  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, esquecimentoJogador, pcJogador, pcNpc, turno]);
+  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, esquecimentoJogador, pcJogador, pcNpc, turno, deckJogadorVazio]);
 
   // Dispara o primeiro turno do NPC após o estado da mão ser atualizado por iniciarJogo.
   // Fica DEPOIS de npcExecutarTurno para evitar ReferenceError de temporal dead zone (const).
@@ -1483,13 +1492,16 @@ export function useBattleState(npc) {
   }, [campoNpc]);
 
   const confirmarCombate = useCallback(() => {
-    setCombatePendente(prev => {
-      if (!prev) return null;
-      setPcJogador(p => Math.max(0, p - prev.dano));
-      setLog(logs => [...logs, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE] Confirmado — ${prev.atacanteNome} causou ${prev.dano} de dano.`, color: '#c84d2a' }]);
-      return null;
-    });
-  }, []);
+    if (!combatePendente) return;
+    if (combatePendente.atacante && combatePendente.alvo) {
+      resolverCombateCompleto(combatePendente.atacante, combatePendente.alvo, true);
+    } else {
+      const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      setPcJogador(p => Math.max(0, p - combatePendente.dano));
+      setLog(logs => [...logs, { t: now, text: `[COMBATE] Confirmado — ${combatePendente.atacanteNome} causou ${combatePendente.dano} de dano.`, color: '#c84d2a' }]);
+      setCombatePendente(null);
+    }
+  }, [combatePendente, resolverCombateCompleto]);
 
   const aplicarResultadoCombate = useCallback((atacanteCard, defensoraCard) => {
     const { defensoraDestruida, atacanteDestruido, danoAoPC } = resolverCombate(atacanteCard, defensoraCard);
@@ -1536,6 +1548,7 @@ export function useBattleState(npc) {
     turno, vezDoNpc, log, fimDeJogo, prontoParaJogar,
     combatePendente, folcloricaPendente, setFolcloricaPendente,
     narracaoJogador, setNarracaoJogador,
+    deckJogadorVazio, setDeckJogadorVazio,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,

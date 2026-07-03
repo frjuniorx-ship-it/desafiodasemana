@@ -29,6 +29,7 @@ export default function Battle({ npc, onGameOver, token }) {
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
     folcloricaPendente,
     narracaoJogador, setNarracaoJogador,
+    deckJogadorVazio, setDeckJogadorVazio,
     esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
@@ -381,6 +382,10 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'remover':
         setChat(prev => [...prev, { kind: 'ai', text: 'Remoção manual não disponível.' }]);
+        break;
+      case 'declarar_deck_vazio':
+        setDeckJogadorVazio(true);
+        setChat(prev => [...prev, { kind: 'system', text: 'Baralho zerado declarado. Você perderá no início do próximo turno do NPC (regra 4.0).' }]);
         break;
       case 'passar_vez':
         if (!vezDoNpc) passarVez();
