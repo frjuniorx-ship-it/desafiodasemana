@@ -72,7 +72,7 @@ function normalizeCardForSlot(entrada) {
   const efeitos = entrada.efeito ?? [];
   const effectText = Array.isArray(efeitos)
     ? efeitos.map(e => e.display_name ?? e.name ?? '').filter(Boolean).join(' · ')
-    : '';
+    : typeof efeitos === 'string' ? efeitos : '';
 
   const category = entrada.categoria ?? entrada.tipo ?? entrada.category ?? 'Personagem';
   return {
