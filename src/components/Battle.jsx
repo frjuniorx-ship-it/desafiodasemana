@@ -117,6 +117,7 @@ export default function Battle({ npc, onGameOver, token }) {
       return true;
     }
 
+    const curupiraAtivo = (campoNpc.efeitosGlobais || []).some(e => e.tipo === 'curupira');
     const estado = { turno, nomeNpc: npcName, pcNpc, pcJogador, campoNpc, campoJogador, combatePendente };
     const resultado = processarAcaoBatalha(text, estado);
 
@@ -255,6 +256,7 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'iniciar_folclorica': {
         if (!validarLimiteTurno('folclorica')) break;
+        if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg }]);
           else if (r.precisaDescarte) setChat(prev => [...prev, { kind: 'ia', text: `${r.carta.name} requer ${r.nd} descarte(s). Quais cartas você descartou? Diga "descarto [cartas]" para registrar no esquecimento e ativar a carta.` }]);
@@ -264,6 +266,7 @@ export default function Battle({ npc, onGameOver, token }) {
       }
       case 'folclorica_com_descarte': {
         if (!validarLimiteTurno('folclorica')) break;
+        if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) { setChat(prev => [...prev, { kind: 'system', text: r.msg }]); return; }
           const cartasList = resultado.descarte
@@ -281,6 +284,7 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'declarar_descarte': {
+        if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
         if (!folcloricaPendente) {
           addChatMsg('ai', 'Não há folclórica aguardando descarte.');
           break;

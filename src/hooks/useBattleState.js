@@ -390,13 +390,19 @@ export function useBattleState(npc) {
         addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'efeito de descarte ativado'}.`, '#c84d2a');
       } else if (behaviors.includes('modify_stats') || slug === 'gorjala') {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] } : null);
+          const personagens = prev.personagens.map(c => {
+            if (!c || temKeyword(c, KEYWORDS.IMUNIZAR)) return c;
+            return { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] };
+          });
           addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
       } else if (behaviors.includes('apply_status') || slug === 'pisadeira') {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
+          const personagens = prev.personagens.map(c => {
+            if (!c || temKeyword(c, KEYWORDS.IMUNIZAR)) return c;
+            return { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] };
+          });
           addLog(`[FOLCLÓRICA] ${folc.name}: paralisou seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
@@ -570,6 +576,12 @@ export function useBattleState(npc) {
     const qtd = workMao.length === 0
       ? COMPRA_MAO_VAZIA
       : (ehPrimeiroTurnoNpc && npcComecouRef.current ? 0 : COMPRA_POR_TURNO);
+    if (qtd > 0 && workDeck.length === 0) {
+      addLog('[FIM] Baralho do NPC está vazio — você venceu! (regra 4.0)', '#8ac46a');
+      setFimDeJogo('vitoria');
+      setVezDoNpc(false);
+      return;
+    }
     const compradas = workDeck.splice(0, qtd);
     workMao = [...workMao, ...compradas];
     setDeckNpc([...workDeck]);
@@ -631,9 +643,12 @@ export function useBattleState(npc) {
       }
     }
 
+    // Curupira do jogador bloqueia ações e folclóricas do NPC
+    const curupiraBloqueandoNpc = (campoJogador.efeitosGlobais || []).some(e => e.tipo === 'curupira');
+
     // 4. Jogar ação (acao_rapida → esquecimento; acao_continua → slot de ação)
     await delay(800);
-    if (!flags.jogouAcao) {
+    if (!flags.jogouAcao && !curupiraBloqueandoNpc) {
       const mi = workMao.findIndex(c => isAcaoRapida(c) || isAcaoContinua(c));
       if (mi !== -1) {
         const carta = workMao[mi];
@@ -654,7 +669,7 @@ export function useBattleState(npc) {
 
     // 5. Jogar folclórica com critério de utilidade — só joga se utilidade >= 5
     await delay(800);
-    if (!flags.jogouFolclorica) {
+    if (!flags.jogouFolclorica && !curupiraBloqueandoNpc) {
       const estadoAtual = { campoJogador, campoNpc: workCampo, pcJogador, pcNpc };
       const candidatas = workMao
         .filter(c => isFolclorica(c) && podeSer_Jogada_Folclorica(c, workMao))
@@ -715,7 +730,13 @@ export function useBattleState(npc) {
         await delay(800);
         const atkEfetivo = (atk.atk ?? 0) + calcularFuria(atk, totalEmCampo);
 
-        if (alvosJogador.length > 0) {
+        // INTIMIDAR: ataca PC diretamente mesmo com personagens em campo
+        if (alvosJogador.length > 0 && temKeyword(atk, KEYWORDS.INTIMIDAR)) {
+          workPcJ = Math.max(0, workPcJ - atkEfetivo);
+          setPcJogador(workPcJ);
+          addLog(`[INTIMIDAR] ${atk.name} intimidou e atacou o PC diretamente! ${atkEfetivo} de dano.`, '#c84d2a');
+          if (checkFimDeJogo(workPcJ, workPcN)) return;
+        } else if (alvosJogador.length > 0) {
           let candidatos = alvoAtrair ? [alvoAtrair] : alvosJogador;
           // Evitar VENENO_MORTAL quando possível
           const semVeneno = candidatos.filter(c => !temKeyword(c, KEYWORDS.VENENO_MORTAL));
