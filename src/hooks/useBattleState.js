@@ -235,6 +235,11 @@ function avaliarUtilidadeFolclorica(folc, estadoCampo) {
     return adversarioTemPlantas ? 6 : 2;
   }
 
+  // Besta-Fera — distribui carta do esquecimento: utilidade média
+  if (slug === 'besta-fera') {
+    return 5;
+  }
+
   return 2; // utilidade baixa para folclórica não reconhecida
 }
 
@@ -436,6 +441,45 @@ export function useBattleState(npc) {
           efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'homem_do_saco', turnos: 5, pcPorTurno: 1 }],
         }));
         addLog('[EFEITO] O Homem do Saco: você perde 1 PC por turno durante 5 turnos', '#c84d2a');
+      } else if (slug === 'saci-perere') {
+        setCampoJogador(prev => {
+          const names = prev.personagens.filter(Boolean).map(c => c.name);
+          if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${names.join(', ')} ao seu baralho (remoção).`, '#c84d2a');
+          else addLog(`[FOLCLÓRICA] ${folc.name}: campo adversário vazio.`, '#c84d2a');
+          return { ...prev, personagens: prev.personagens.map(() => null) };
+        });
+      } else if (slug === 'besta-fera') {
+        const cartaJogador = esquecimentoJogador[0];
+        if (cartaJogador) {
+          setEsquecimentoJogador(prev => prev.slice(1));
+          addLog(`[FOLCLÓRICA] ${folc.name}: ${cartaJogador.name} do seu esquecimento voltou à sua mão.`, '#c84d2a');
+        } else {
+          addLog(`[FOLCLÓRICA] ${folc.name}: seu esquecimento está vazio.`, '#c84d2a');
+        }
+        const cartaNpc = esquecimentoNpc[0];
+        if (cartaNpc) {
+          setEsquecimentoNpc(prev => prev.slice(1));
+          setMaoNpc(prev => [...prev, cartaNpc]);
+          addLog(`[FOLCLÓRICA] ${folc.name}: NPC recuperou uma carta do esquecimento.`, '#c84d2a');
+        }
+      } else if (slug === 'curupira') {
+        setCampoNpc(prev => ({
+          ...prev,
+          efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'curupira', turnos: 2 }],
+        }));
+        addLog(`[FOLCLÓRICA] ${folc.name}: você não pode usar magias/ações por 2 turnos.`, '#c84d2a');
+      } else if (slug === 'anhanga') {
+        // TODO: Anhangá — seleção de carta do campo/esquecimento adversário (interação do jogador necessária)
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'copia uma carta do campo ou esquecimento adversário'}.`, '#c84d2a');
+      } else if (slug === 'vitoria-regia') {
+        // TODO: Vitória-Régia — equipa em personagem NPC e habilita ataque direto ao PC adversário
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'próximo ataque do NPC ignora personagens adversários'}.`, '#c84d2a');
+      } else if (slug === 'lobisomem') {
+        // TODO: Lobisomem — verificar texto oficial da carta
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c84d2a');
+      } else if (slug === 'cuca') {
+        // TODO: Cuca — verificar texto oficial da carta
+        addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c84d2a');
       } else {
         addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c84d2a');
       }
@@ -717,7 +761,7 @@ export function useBattleState(npc) {
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
-  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
+  }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, esquecimentoJogador, pcJogador, pcNpc, turno]);
 
   // Dispara o primeiro turno do NPC após o estado da mão ser atualizado por iniciarJogo.
   // Fica DEPOIS de npcExecutarTurno para evitar ReferenceError de temporal dead zone (const).
@@ -870,8 +914,57 @@ export function useBattleState(npc) {
       });
       return;
     }
+    if (slug === 'saci-perere') {
+      setCampoNpc(prev => {
+        const names = prev.personagens.filter(Boolean).map(c => c.name);
+        if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${names.join(', ')} ao baralho do NPC (remoção).`, '#c89b3c');
+        else addLog(`[FOLCLÓRICA] ${folc.name}: campo do NPC vazio.`, '#c89b3c');
+        return { ...prev, personagens: prev.personagens.map(() => null) };
+      });
+      return;
+    }
+    if (slug === 'besta-fera') {
+      const cartaNpc = esquecimentoNpc[0];
+      if (cartaNpc) {
+        setEsquecimentoNpc(prev => prev.slice(1));
+        setMaoNpc(prev => [...prev, cartaNpc]);
+        addLog(`[FOLCLÓRICA] ${folc.name}: NPC recuperou ${cartaNpc.name} do esquecimento.`, '#c89b3c');
+      } else {
+        addLog(`[FOLCLÓRICA] ${folc.name}: esquecimento do NPC vazio.`, '#c89b3c');
+      }
+      addLog(`[FOLCLÓRICA] ${folc.name}: pegue 1 carta do seu esquecimento (se houver).`, '#c89b3c');
+      return;
+    }
+    if (slug === 'curupira') {
+      setCampoJogador(prev => ({
+        ...prev,
+        efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'curupira', turnos: 2 }],
+      }));
+      addLog(`[FOLCLÓRICA] ${folc.name}: NPC não pode usar magias/ações por 2 turnos.`, '#c89b3c');
+      return;
+    }
+    if (slug === 'anhanga') {
+      // TODO: Anhangá — seleção de carta do campo/esquecimento NPC (interação do jogador necessária)
+      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'escolha uma carta do campo ou esquecimento do NPC para copiar'}.`, '#c89b3c');
+      return;
+    }
+    if (slug === 'vitoria-regia') {
+      // TODO: Vitória-Régia — equipa em personagem seu e habilita ataque direto ao PC
+      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || 'seu próximo ataque ignora personagens adversários'}.`, '#c89b3c');
+      return;
+    }
+    if (slug === 'lobisomem') {
+      // TODO: Lobisomem — verificar texto oficial da carta
+      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
+      return;
+    }
+    if (slug === 'cuca') {
+      // TODO: Cuca — verificar texto oficial da carta
+      addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
+      return;
+    }
     addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
-  }, [campoNpc]);
+  }, [campoNpc, esquecimentoNpc]);
 
   const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false, pendente = null) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
