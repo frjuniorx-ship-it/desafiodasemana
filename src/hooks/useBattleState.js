@@ -619,6 +619,7 @@ export function useBattleState(npc) {
             atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
             def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
             pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+            effect_blocks: [...(alvo.effect_blocks ?? []), ...(equip.effect_blocks ?? [])],
             equipamentos: [...(alvo.equipamentos ?? []), equip],
           };
           workMao.splice(mi, 1);
@@ -1278,7 +1279,9 @@ export function useBattleState(npc) {
   const jogadorEquiparCarta = useCallback(async (nomeEquip, nomeAlvo) => {
     const { carta: rawEquip } = await buscarCartaFuzzy(nomeEquip);
     if (!rawEquip) return { ok: false, msg: `Equipamento "${nomeEquip}" não encontrado.` };
+    console.log('[equipar] rawEquip da API:', JSON.stringify({ nome: rawEquip.nome, atq: rawEquip.atq, ataque: rawEquip.ataque, def: rawEquip.def, defesa: rawEquip.defesa, pc: rawEquip.pc, effect_blocks: rawEquip.effect_blocks }));
     const equip = normalizeCardForSlot(rawEquip);
+    console.log('[equipar] equip normalizado:', JSON.stringify({ name: equip.name, atk: equip.atk, def: equip.def, pc: equip.pc, effect_blocks_count: equip.effect_blocks?.length }));
     const nAlvo = normStr(nomeAlvo);
     const idx = campoJogador.personagens.findIndex(c => {
       if (!c) return false;
@@ -1297,6 +1300,7 @@ export function useBattleState(npc) {
         atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
         def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
         pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+        effect_blocks: [...(alvo.effect_blocks ?? []), ...(equip.effect_blocks ?? [])],
         equipamentos: [...(alvo.equipamentos ?? []), equip],
       };
       return { ...prev, personagens };
