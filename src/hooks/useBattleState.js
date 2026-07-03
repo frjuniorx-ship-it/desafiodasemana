@@ -1094,6 +1094,45 @@ export function useBattleState(npc) {
     if (emResposta) setCombatePendente(null);
   }, []);
 
+  const ativarPlantaContraAtaque = useCallback(async (nomePlanta) => {
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#8ac46a') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    const { carta: raw } = await buscarCartaFuzzy(nomePlanta);
+    if (!raw) return { sucesso: false };
+    const carta = normalizeCardForSlot(raw);
+    const atqBonus = carta.atk || 0;
+    const defBonus = carta.def || 0;
+    setCombatePendente(prevCombate => {
+      if (!prevCombate) {
+        addLog(`[PLANTA] ${carta.name} revelada (sem combate pendente).`);
+        return prevCombate;
+      }
+      const alvoNome = prevCombate.alvo?.name || prevCombate.alvo?.nome || prevCombate.alvoNome;
+      if (alvoNome && (atqBonus || defBonus)) {
+        setCampoJogador(prevCampo => ({
+          ...prevCampo,
+          personagens: prevCampo.personagens.map(c =>
+            c && (c.name === alvoNome || c.nome === alvoNome)
+              ? { ...c, atk: (c.atk || 0) + atqBonus, def: (c.def || 0) + defBonus }
+              : c
+          ),
+        }));
+        addLog(`[PLANTA] ${carta.name} ativada — ${alvoNome} recebe +${atqBonus}/+${defBonus}.`);
+        return {
+          ...prevCombate,
+          alvo: {
+            ...prevCombate.alvo,
+            atk: (prevCombate.alvo?.atk || 0) + atqBonus,
+            def: (prevCombate.alvo?.def || 0) + defBonus,
+          },
+        };
+      }
+      addLog(`[PLANTA] ${carta.name} ativada.`);
+      return prevCombate;
+    });
+    return { sucesso: true };
+  }, []);
+
   const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
@@ -1279,9 +1318,7 @@ export function useBattleState(npc) {
   const jogadorEquiparCarta = useCallback(async (nomeEquip, nomeAlvo) => {
     const { carta: rawEquip } = await buscarCartaFuzzy(nomeEquip);
     if (!rawEquip) return { ok: false, msg: `Equipamento "${nomeEquip}" não encontrado.` };
-    console.log('[equipar] rawEquip da API:', JSON.stringify({ nome: rawEquip.nome, atq: rawEquip.atq, ataque: rawEquip.ataque, def: rawEquip.def, defesa: rawEquip.defesa, pc: rawEquip.pc, effect_blocks: rawEquip.effect_blocks }));
     const equip = normalizeCardForSlot(rawEquip);
-    console.log('[equipar] equip normalizado:', JSON.stringify({ name: equip.name, atk: equip.atk, def: equip.def, pc: equip.pc, effect_blocks_count: equip.effect_blocks?.length }));
     const nAlvo = normStr(nomeAlvo);
     const idx = campoJogador.personagens.findIndex(c => {
       if (!c) return false;
@@ -1425,7 +1462,7 @@ export function useBattleState(npc) {
     narracaoJogador, setNarracaoJogador,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
-    jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, resolverCombateCompleto,
+    jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,
     iniciarJogo,

@@ -25,7 +25,7 @@ export default function Battle({ npc, onGameOver, token }) {
     combatePendente,
     passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
-    jogadorIniciarFolclorica, jogadorCompletarFolclorica, jogadorExecutarEfeitoPlanta, resolverCombateCompleto,
+    jogadorIniciarFolclorica, jogadorCompletarFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
     folcloricaPendente,
     narracaoJogador, setNarracaoJogador,
     esquecimentoJogador,
@@ -228,7 +228,12 @@ export default function Battle({ npc, onGameOver, token }) {
         jogadorRevelarPlanta(resultado.carta, resultado.slot).then(r => {
           if (r.ok) {
             setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} revelada em campo.` }]);
-            jogadorExecutarEfeitoPlanta(r.carta, !!combatePendente, combatePendente);
+            const isContraAtaque = (r.carta.effect_blocks || []).some(b => b.trigger === 'on_counterattack');
+            if (combatePendente && isContraAtaque) {
+              ativarPlantaContraAtaque(resultado.carta);
+            } else {
+              jogadorExecutarEfeitoPlanta(r.carta, !!combatePendente, combatePendente);
+            }
           } else {
             setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
           }
