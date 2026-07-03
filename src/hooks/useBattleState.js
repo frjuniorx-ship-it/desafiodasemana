@@ -391,7 +391,7 @@ export function useBattleState(npc) {
         });
       } else if (behaviors.includes('apply_status') || slug === 'pisadeira') {
         setCampoJogador(prev => {
-          const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
+          const personagens = prev.personagens.map(c => c ? { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
           addLog(`[FOLCLÓRICA] ${folc.name}: paralisou seus personagens.`, '#c84d2a');
           return { ...prev, personagens };
         });
@@ -447,7 +447,7 @@ export function useBattleState(npc) {
       if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
         setCampoNpc(prev => ({
           ...prev,
-          personagens: prev.personagens.map(c => c ? { ...c, paralisada: false, imobilizada: false, arruinada: false } : null),
+          personagens: prev.personagens.map(c => c ? { ...c, paralisado: false, imobilizado: false, arruinada: false } : null),
         }));
         addLog(`[PLANTA] ${carta.name}: removeu encantamentos do campo NPC.`, '#8ac46a');
       } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
@@ -660,7 +660,7 @@ export function useBattleState(npc) {
     // 7. Atacar — calcularFuria, evitar VENENO_MORTAL, respeitar ATRAIR, preferir menor DEF
     await delay(800);
     {
-      const atacantes = workCampo.personagens.filter(c => c && podeAtacar(c));
+      const atacantes = workCampo.personagens.filter(c => c && podeAtacar(c) && !c.paralisado && !c.imobilizado);
       const totalEmCampo = workCampo.personagens.filter(Boolean).length;
       const alvosJogador = campoJogador.personagens.filter(Boolean);
       // ATRAIR: se algum alvo tem ATRAIR, todos os ataques devem ser direcionados a ele
@@ -715,8 +715,6 @@ export function useBattleState(npc) {
     );
 
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
-    decrementarEfeitosCampo(setCampoJogador);
-    decrementarEfeitosCampo(setCampoNpc);
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, pcJogador, pcNpc, turno]);
@@ -823,7 +821,7 @@ export function useBattleState(npc) {
     }
     if (behaviors.includes('apply_status') || slug === 'pisadeira') {
       setCampoNpc(prev => {
-        const personagens = prev.personagens.map(c => c ? { ...c, paralisada: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
+        const personagens = prev.personagens.map(c => c ? { ...c, paralisado: true, efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'pisadeira', turnos: 3 }] } : null);
         addLog(`[FOLCLÓRICA] ${folc.name}: paralisou personagens do NPC.`, '#c89b3c');
         return { ...prev, personagens };
       });
