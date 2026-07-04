@@ -30,6 +30,7 @@ export default function Battle({ npc, onGameOver, token }) {
     folcloricaPendente,
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
+    folcloricasAtivasJogador, folcloricasAtivasNpc,
     esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
@@ -320,16 +321,11 @@ export default function Battle({ npc, onGameOver, token }) {
         if (curupiraAtivo) { addChatMsg('ai', 'Curupira ativo — folclóricas bloqueadas neste turno.'); break; }
         jogadorIniciarFolclorica(resultado.carta).then(r => {
           if (!r.ok) { setChat(prev => [...prev, { kind: 'system', text: r.msg }]); return; }
-          const cartasList = resultado.descarte
-            ? resultado.descarte.split(/,|\s+e\s+/).map(s => s.trim()).filter(Boolean)
-            : [];
-          const res = jogadorCompletarFolclorica(cartasList);
-          if (res.ok) {
-            setChat(prev => [...prev, { kind: 'system', text: `${res.carta.name} ativado.` }]);
-            if (cartasList.length > 0)
-              addChatMsg('ia', `Registrei ${cartasList.join(', ')} no seu esquecimento.`);
+          if (r.precisaDescarte) {
+            addChatMsg('ia', `${r.carta.name} exige descarte de ${r.nd} carta(s). Diga exatamente quais cartas você descartou. Ex: "descartei [Carta A] e [Carta B]"`);
           } else {
-            setChat(prev => [...prev, { kind: 'system', text: res.msg }]);
+            setChat(prev => [...prev, { kind: 'system', text: `${r.carta.name} ativado.` }]);
+            setAcoesRapidas([]);
           }
         });
         break;
@@ -584,7 +580,21 @@ export default function Battle({ npc, onGameOver, token }) {
                     <PlantSlot key={i} card={carta} side="npc" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UtilSlot kind="folc" count={campoNpc.folcloricas?.length ?? 0} side="npc" />
+                    {folcloricasAtivasNpc.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', overflowY: 'auto' }}>
+                        {folcloricasAtivasNpc.map((f, i) => (
+                          <div key={i} style={{ position: 'relative', width: 48, flexShrink: 0, aspectRatio: '5/7' }}>
+                            {f.imagemUrl
+                              ? <img src={f.imagemUrl} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 3 }} alt="" />
+                              : <div style={{ background: '#2a1a0a', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c89b3c', fontSize: 9, textAlign: 'center', padding: 2, borderRadius: 3, border: '1px solid rgba(200,155,60,.3)' }}>{f.nome}</div>
+                            }
+                            <div style={{ position: 'absolute', bottom: 2, right: 2, background: '#c84d2a', color: '#fff', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>{f.turnos}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <UtilSlot kind="folc" count={campoNpc.folcloricas?.length ?? 0} side="npc" />
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
@@ -621,7 +631,21 @@ export default function Battle({ npc, onGameOver, token }) {
                     <PlantSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
                   ))}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UtilSlot kind="folc" count={campoJogador.folcloricas?.length ?? 0} side="player" />
+                    {folcloricasAtivasJogador.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', overflowY: 'auto' }}>
+                        {folcloricasAtivasJogador.map((f, i) => (
+                          <div key={i} style={{ position: 'relative', width: 48, flexShrink: 0, aspectRatio: '5/7' }}>
+                            {f.imagemUrl
+                              ? <img src={f.imagemUrl} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 3 }} alt="" />
+                              : <div style={{ background: '#2a1a0a', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c89b3c', fontSize: 9, textAlign: 'center', padding: 2, borderRadius: 3, border: '1px solid rgba(200,155,60,.3)' }}>{f.nome}</div>
+                            }
+                            <div style={{ position: 'absolute', bottom: 2, right: 2, background: '#c84d2a', color: '#fff', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 'bold', lineHeight: 1 }}>{f.turnos}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <UtilSlot kind="folc" count={campoJogador.folcloricas?.length ?? 0} side="player" />
+                    )}
                   </div>
                 </div>
               </div>

@@ -268,6 +268,8 @@ export function useBattleState(npc) {
     maoFinalTurnoAnterior: null,
   });
   const [deckJogadorVazio, setDeckJogadorVazio] = useState(false);
+  const [folcloricasAtivasJogador, setFolcloricasAtivasJogador] = useState([]);
+  const [folcloricasAtivasNpc, setFolcloricasAtivasNpc] = useState([]);
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
   const campoJogadorRef = useRef(campoPadrao());
@@ -359,6 +361,7 @@ export function useBattleState(npc) {
     decrementarEfeitosCampo(setCampoJogador);
     decrementarEfeitosCampo(setCampoNpc);
     decrementarEfeitosGlobais();
+    setFolcloricasAtivasJogador(prev => prev.map(f => ({ ...f, turnos: f.turnos - 1 })).filter(f => f.turnos > 0));
 
     // Executa efeito de folclórica do NPC (afeta campo do JOGADOR)
     const executarEfeitoFolcloricaNpc = (folc) => {
@@ -460,6 +463,7 @@ export function useBattleState(npc) {
           ...prev,
           efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'homem_do_saco', turnos: 5, pcPorTurno: 1 }],
         }));
+        setFolcloricasAtivasNpc(prev => [...prev, { carta: folc, nome: folc.name, imagemUrl: folc.imagem_url || '', turnos: 5, turnosMax: 5, efeito: 'homem_do_saco' }]);
         addLog('[EFEITO] O Homem do Saco: você perde 1 PC por turno durante 5 turnos', '#c84d2a');
       } else if (slug === 'saci-perere') {
         setCampoJogador(prev => {
@@ -809,6 +813,7 @@ export function useBattleState(npc) {
     );
 
     setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens], plantas: [...workCampo.plantas] });
+    setFolcloricasAtivasNpc(prev => prev.map(f => ({ ...f, turnos: f.turnos - 1 })).filter(f => f.turnos > 0));
     setVezDoNpc(false);
     addLog('[AÇÃO] NPC passou a vez — sua jogada', '#7a6a45');
   }, [maoNpc, deckNpc, campoNpc, campoJogador, esquecimentoNpc, esquecimentoJogador, pcJogador, pcNpc, turno, deckJogadorVazio]);
@@ -917,6 +922,7 @@ export function useBattleState(npc) {
         ...prev,
         efeitosGlobais: [...(prev.efeitosGlobais || []), { tipo: 'homem_do_saco', turnos: 5, pcPorTurno: 1 }],
       }));
+      setFolcloricasAtivasJogador(prev => [...prev, { carta: folc, nome: folc.name, imagemUrl: folc.imagem_url || '', turnos: 5, turnosMax: 5, efeito: 'homem_do_saco' }]);
       addLog('[EFEITO] O Homem do Saco: NPC perde 1 PC por turno durante 5 turnos.', '#c89b3c');
       return;
     }
@@ -1626,6 +1632,7 @@ export function useBattleState(npc) {
     combatePendente, folcloricaPendente, setFolcloricaPendente,
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
+    folcloricasAtivasJogador, folcloricasAtivasNpc,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
