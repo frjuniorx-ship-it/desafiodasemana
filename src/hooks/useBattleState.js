@@ -86,7 +86,7 @@ function normalizeCardForSlot(entrada) {
     effect:     effectText,
     wp_id:      entrada.wp_id ?? null,
     slug:       entrada.slug  ?? null,
-    nd:         entrada.nd ?? null,
+    nd:         entrada.nd ?? entrada.numero_descarte ?? null,
     mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
     classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
     effect_blocks: toArray(entrada.effect_blocks ?? []),
@@ -1390,8 +1390,10 @@ export function useBattleState(npc) {
   const jogadorIniciarFolclorica = useCallback(async (nomeFolc) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeFolc);
     if (!raw) return { ok: false, sugestao, msg: `Folclórica "${nomeFolc}" não encontrada.` };
+    console.log('[FOLCLORICA] carta encontrada:', raw?.nome, '| nd:', raw?.nd, '| numero_descarte:', raw?.numero_descarte);
     const folc = normalizeCardForSlot(raw);
     const nd = folc.nd ?? 0;
+    console.log('[FOLCLORICA] nd após normalização:', nd);
     if (nd === 0) {
       executarEfeitoFolclorica(folc);
       setCampoJogador(prev => ({ ...prev, folcloricas: [...prev.folcloricas, folc] }));
