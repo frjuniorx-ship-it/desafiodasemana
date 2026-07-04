@@ -759,12 +759,18 @@ export function useBattleState(npc) {
           if (checkFimDeJogo(workPcJ, workPcN)) return;
         } else if (alvosJogador.length > 0) {
           let candidatos = alvoAtrair ? [alvoAtrair] : alvosJogador;
+          // PROTEGER: forçar alvo com PROTEGER (regra PROTEGER)
+          const alvoProteger = candidatos.find(c => temKeyword(c, KEYWORDS.PROTEGER));
+          if (alvoProteger) candidatos = [alvoProteger];
           // Evitar VENENO_MORTAL quando possível
           const semVeneno = candidatos.filter(c => !temKeyword(c, KEYWORDS.VENENO_MORTAL));
           if (semVeneno.length > 0) candidatos = semVeneno;
           // Preferir alvo com menor DEF (mais fácil de destruir)
           const alvo = candidatos.slice().sort((a, b) => (a.def ?? 0) - (b.def ?? 0))[0];
-          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo, atacante: atk, alvo });
+          // FURIA: armazenar ATQ com bônus no objeto atacante para resolverCombateCompleto
+          const furiaBonus = atkEfetivo - (atk.atk ?? 0);
+          const atacanteParaCombate = furiaBonus > 0 ? { ...atk, atk: atkEfetivo, furiaBonus } : atk;
+          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo, atacante: atacanteParaCombate, alvo });
           addLog(`[COMBATE] ${atk.name} atacou ${alvo.name} — confirme ou responda com carta`, '#c84d2a');
           break; // aguarda confirmação antes de continuar ataques
         } else {
@@ -1191,6 +1197,9 @@ export function useBattleState(npc) {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
     const atkA = atacanteCard.atk ?? 0;
+    if (atacanteCard.furiaBonus > 0) {
+      addLog(`[FÚRIA] ${atacanteCard.name} +${atacanteCard.furiaBonus} ATQ de bônus (FÚRIA).`, '#d4a857');
+    }
     const defD = defensoraCard.defAtual ?? defensoraCard.def ?? 0;
     const temVeneno = temKeyword(defensoraCard, KEYWORDS.VENENO_MORTAL);
     const temAtravessar = temKeyword(atacanteCard, KEYWORDS.ATRAVESSAR);
@@ -1222,6 +1231,28 @@ export function useBattleState(npc) {
         setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
       } else {
         setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
+      }
+    }
+
+    // ARRUINAR — defensor sobreviveu: setar arruinada (regra ARRUINAR)
+    if (!defensoraDestruida && temKeyword(atacanteCard, KEYWORDS.ARRUINAR)) {
+      if (npcAtaca) {
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, arruinada: true } : c) }));
+        addLog(`[ARRUINAR] ${defensoraCard.name} foi arruinada — não pode ser substituída.`, '#c84d2a');
+      } else {
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, arruinada: true } : c) }));
+        addLog(`[ARRUINAR] ${defensoraCard.name} foi arruinada — não pode ser substituída.`, '#f5d27a');
+      }
+    }
+
+    // IMOBILIZAR — defensor sobreviveu: setar imobilizado (regra IMOBILIZAR)
+    if (!defensoraDestruida && temKeyword(atacanteCard, KEYWORDS.IMOBILIZAR)) {
+      if (npcAtaca) {
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, imobilizado: true } : c) }));
+        addLog(`[IMOBILIZAR] ${defensoraCard.name} foi imobilizada — não pode atacar.`, '#c84d2a');
+      } else {
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, imobilizado: true } : c) }));
+        addLog(`[IMOBILIZAR] ${defensoraCard.name} foi imobilizada — não pode atacar.`, '#f5d27a');
       }
     }
 
@@ -1451,7 +1482,22 @@ export function useBattleState(npc) {
     const alvo = nomeAlvo ? buscarNoCampo(campoNpc, nomeAlvo) : null;
     if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
 
-    resolverCombateCompleto(atacante, alvo, false);
+    // ATRAIR: forçar alvo com ATRAIR se existir (regra ATRAIR)
+    const alvoAtrairNpc = campoNpc.personagens.filter(Boolean).find(c => temKeyword(c, KEYWORDS.ATRAIR));
+    if (alvoAtrairNpc && alvo.name !== alvoAtrairNpc.name) {
+      return { ok: false, msg: `${alvoAtrairNpc.name} tem ATRAIR — você deve atacar esta carta primeiro.` };
+    }
+    // PROTEGER: forçar alvo com PROTEGER se existir (regra PROTEGER)
+    const alvoProtegerNpc = campoNpc.personagens.filter(Boolean).find(c => temKeyword(c, KEYWORDS.PROTEGER));
+    if (alvoProtegerNpc && alvo.name !== alvoProtegerNpc.name) {
+      return { ok: false, msg: `${alvoProtegerNpc.name} tem PROTEGER — você deve atacar esta carta protetora primeiro.` };
+    }
+    // FURIA: aplicar bônus de ATQ antes do combate (regra FÚRIA)
+    const totalEmCampo = campoCurrent.personagens.filter(Boolean).length;
+    const furiaBonus = calcularFuria(atacante, totalEmCampo);
+    const atacanteParaCombate = furiaBonus > 0 ? { ...atacante, atk: (atacante.atk ?? 0) + furiaBonus, furiaBonus } : atacante;
+
+    resolverCombateCompleto(atacanteParaCombate, alvo, false);
     // Atualiza ref imediatamente para bloquear duplo-ataque na mesma rodada (regra 26.0)
     campoJogadorRef.current = {
       ...campoCurrent,
@@ -1465,13 +1511,14 @@ export function useBattleState(npc) {
   }, [campoNpc, resolverCombateCompleto]);
 
   const jogadorAtaqueDireto = useCallback((nomeAtacante) => {
-    if (campoNpc.personagens.some(Boolean)) {
-      return { ok: false, msg: 'O NPC tem personagens em campo. Ataque direto não é permitido enquanto houver personagens em campo (regra 28.0).' };
-    }
     const campoCurrent = campoJogadorRef.current;
     const nAtk = normStr(nomeAtacante);
     const atacante = campoCurrent.personagens.find(c => c && normStr(c.name).includes(nAtk));
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
+    // INTIMIDAR: permite ataque direto ao PC mesmo com personagens NPC em campo (regra INTIMIDAR)
+    if (campoNpc.personagens.some(Boolean) && !temKeyword(atacante, KEYWORDS.INTIMIDAR)) {
+      return { ok: false, msg: 'O NPC tem personagens em campo. Ataque direto não é permitido enquanto houver personagens em campo (regra 28.0).' };
+    }
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
