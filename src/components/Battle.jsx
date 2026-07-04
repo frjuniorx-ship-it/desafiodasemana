@@ -90,12 +90,8 @@ export default function Battle({ npc, onGameOver, token }) {
     if (!selecaoAlvo) return;
     const { atacanteCard } = selecaoAlvo;
     setSelecaoAlvo(null);
-    resolverCombateCompleto(atacanteCard, alvoCard, false);
-    setCampoJogador(prev => ({
-      ...prev,
-      personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, atacouNesteTurno: true } : c),
-    }));
-    setChat(prev => [...prev, { kind: 'system', text: `Ataque de ${atacanteCard.name} em ${alvoCard.name}.` }]);
+    const r = jogadorAtacar(atacanteCard.name, alvoCard.name);
+    setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${atacanteCard.name} em ${alvoCard.name}.` : (r.msg || 'Ataque inválido.') }]);
   }
 
   function sendChat(textoOverride) {
