@@ -271,6 +271,7 @@ export function useBattleState(npc) {
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
   const campoJogadorRef = useRef(campoPadrao());
+  const frenesiAnteriorRef = useRef(0);
 
   useEffect(() => {
     if (!npc?._id) return;
@@ -404,7 +405,7 @@ export function useBattleState(npc) {
       } else if (behaviors.includes('modify_stats') || slug === 'gorjala') {
         setCampoJogador(prev => {
           const personagens = prev.personagens.map(c => {
-            if (!c || temKeyword(c, KEYWORDS.IMUNIZAR)) return c;
+            if (!c || temKeyword(c, KEYWORDS.IMUNIZAR) || temKeyword(c, KEYWORDS.RESISTENCIA)) return c;
             return { ...c, atk: Math.max(0, (c.atk ?? 0) - 2), def: Math.max(0, (c.def ?? 0) - 2), efeitosAtivos: [...(c.efeitosAtivos || []), { tipo: 'gorjala', turnos: 2 }] };
           });
           addLog(`[FOLCLÓRICA] ${folc.name}: -2/-2 em seus personagens.`, '#c84d2a');
@@ -829,6 +830,26 @@ export function useBattleState(npc) {
 
   useEffect(() => { campoJogadorRef.current = campoJogador; }, [campoJogador]);
 
+  // FRENESI — 3 cartas com FRENESI em campo remove todos os personagens do NPC (remoção, não destruição)
+  // Jogador paga 1 PC por personagem removido; ativado pela última carta a entrar
+  useEffect(() => {
+    if (!prontoParaJogar || fimDeJogo) return;
+    const frenesiCount = campoJogador.personagens.filter(Boolean).filter(c => temKeyword(c, KEYWORDS.FRENESI)).length;
+    if (frenesiAnteriorRef.current < 3 && frenesiCount >= 3) {
+      const npcPersonagens = campoNpc.personagens.filter(Boolean);
+      const custo = npcPersonagens.length;
+      const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      if (custo > 0) {
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(() => null) }));
+        setPcJogador(p => Math.max(0, p - custo));
+        setLog(prev => [...prev, { t: ts, text: `[FRENESI] 3 cartas com FRENESI! Todos os personagens do NPC removidos. Você paga ${custo} PC.`, color: '#d4a857' }]);
+      } else {
+        setLog(prev => [...prev, { t: ts, text: `[FRENESI] 3 cartas com FRENESI em campo — campo do NPC já estava vazio.`, color: '#d4a857' }]);
+      }
+    }
+    frenesiAnteriorRef.current = frenesiCount;
+  }, [campoJogador.personagens, campoNpc, prontoParaJogar, fimDeJogo]);
+
   const executarEfeitoFolclorica = useCallback((folc) => {
     const slug = folc.slug || '';
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1226,11 +1247,14 @@ export function useBattleState(npc) {
         addLog(`[VENENO] ${defensoraCard.name} envenenou ${atacanteCard.name} — removido sem PC.`, '#8a4a8a');
       }
     } else {
-      const novaDefD = defD - atkA;
+      const temRegenerar = temKeyword(defensoraCard, KEYWORDS.REGENERAR);
+      const novaDefD = temRegenerar ? (defensoraCard.defBase ?? defensoraCard.def ?? 0) : defD - atkA;
       if (npcAtaca) {
-        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
+        if (temRegenerar) addLog(`[REGENERAR] ${defensoraCard.name} regenerou DEF imediatamente.`, '#8ac46a');
       } else {
-        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: true } : c) }));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
+        if (temRegenerar) addLog(`[REGENERAR] ${defensoraCard.name} regenerou DEF imediatamente.`, '#f5d27a');
       }
     }
 
@@ -1254,6 +1278,12 @@ export function useBattleState(npc) {
         setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, imobilizado: true } : c) }));
         addLog(`[IMOBILIZAR] ${defensoraCard.name} foi imobilizada — não pode atacar.`, '#f5d27a');
       }
+    }
+
+    // ABSORVER_CONHECIMENTO — atacante do jogador ganha PC = ATQ (não vale no contra-ataque)
+    if (!npcAtaca && temKeyword(atacanteCard, KEYWORDS.ABSORVER_CONHECIMENTO)) {
+      setPcJogador(p => p + atkA);
+      addLog(`[ABSORVER CONHECIMENTO] ${atacanteCard.name} recuperou ${atkA} PC.`, '#8ac46a');
     }
 
     // Contra-ataque (regra 24.0) — paralisada contra-ataca (regra 27.0)
