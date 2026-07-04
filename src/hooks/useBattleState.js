@@ -119,15 +119,25 @@ function toArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
 function getEquipBonus(equip) {
   for (const bloco of (equip.effect_blocks ?? [])) {
     for (const action of (bloco.actions ?? [])) {
-      if (['modify_stats', 'modify_attack', 'grant_effect'].includes(action.type)) {
+      if (['modify_attack', 'modify_defense', 'modify_stats'].includes(action.type)) {
         const atk = action.value_attack || 0;
         const def = action.value_defense || 0;
         const pc  = action.value_pc     || 0;
         if (atk || def || pc) return { atk, def, pc };
       }
+      if (action.type === 'gain_pc') {
+        const pc = action.value_pc || 0;
+        if (pc) return { atk: 0, def: 0, pc };
+      }
     }
   }
   return { atk: equip.atk ?? 0, def: equip.def ?? 0, pc: equip.pc ?? 0 };
+}
+
+function getActionTypes(carta) {
+  return (carta.effect_blocks || [])
+    .flatMap(b => (b.actions || []).map(a => a.type))
+    .filter(t => t && t !== 'none');
 }
 
 function categoriaParaZona(categoria) {
@@ -181,9 +191,7 @@ function avaliarUtilidadeFolclorica(folc, estadoCampo) {
   const npcTemCampo          = campoNpc.personagens.filter(Boolean).length > 0;
   const slug = folc.slug || '';
 
-  const behaviors = folc.effect_blocks?.flatMap(b =>
-    b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
-  ).filter(Boolean) ?? [];
+  const behaviors = getActionTypes(folc);
 
   // remove_card — Boitatá e similares: só vale se adversário tem campo forte
   if (slug === 'boitata' || (behaviors.includes('remove_card') && slug !== 'iara')) {
@@ -338,11 +346,7 @@ export function useBattleState(npc) {
     const addLog = (text, color = '#e8d5a8') =>
       setLog(prev => [...prev, { t: now(), text, color }]);
 
-    // Extrai behavior slugs de effect_blocks
-    const getBehaviors = (carta) =>
-      carta.effect_blocks?.flatMap(b =>
-        b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
-      ).filter(Boolean) ?? [];
+    const getBehaviors = getActionTypes;
 
     const decrementarEfeitosGlobais = () => {
       const globais = campoNpc.efeitosGlobais || [];
@@ -670,6 +674,36 @@ export function useBattleState(npc) {
         setMaoNpc([...workMao]);
         setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
         addLog(`[NPC] Jogou ${carta.name} em campo`, '#c84d2a');
+        for (const bloco of (melhor.effect_blocks || []).filter(b => b.trigger === 'on_enter_field')) {
+          const tipos = (bloco.actions || []).map(a => a.type).filter(t => t && t !== 'none');
+          if (!tipos.length) continue;
+          let atkBuf = 0, defBuf = 0, pcVal = 0;
+          (bloco.actions || []).forEach(a => { atkBuf += a.value_attack || 0; defBuf += a.value_defense || 0; pcVal += a.value_pc || 0; });
+          if (tipos.some(t => ['modify_attack', 'modify_defense', 'modify_stats'].includes(t)) && bloco.target_scope === 'self') {
+            workCampo.personagens[si] = { ...workCampo.personagens[si], atk: (workCampo.personagens[si].atk ?? 0) + atkBuf, def: (workCampo.personagens[si].def ?? 0) + defBuf };
+            setCampoNpc({ ...workCampo, personagens: [...workCampo.personagens] });
+            if (atkBuf) addLog(`[EFEITO] ${carta.name}: +${atkBuf} ATQ ao entrar em campo.`, '#c89b3c');
+            if (defBuf) addLog(`[EFEITO] ${carta.name}: +${defBuf} DEF ao entrar em campo.`, '#c89b3c');
+          } else if (tipos.includes('lose_pc') && (bloco.target_scope === 'enemy_player' || bloco.target_scope === 'enemy_field')) {
+            workPcJ = Math.max(0, workPcJ - (pcVal || 1));
+            setPcJogador(workPcJ);
+            addLog(`[EFEITO] ${carta.name}: você perde ${pcVal || 1} PC ao entrar.`, '#c84d2a');
+            if (checkFimDeJogo(workPcJ, workPcN)) return;
+          } else if (tipos.includes('gain_pc')) {
+            workPcN = workPcN + (pcVal || 1);
+            setPcNpc(workPcN);
+            addLog(`[EFEITO] ${carta.name}: NPC recupera ${pcVal || 1} PC ao entrar.`, '#c89b3c');
+          } else if (tipos.includes('remove_card') && bloco.target_scope === 'enemy_field') {
+            setCampoJogador(prev => {
+              const personagens = [...prev.personagens];
+              const idx = personagens.findIndex(Boolean);
+              if (idx !== -1) { addLog(`[EFEITO] ${carta.name}: removeu ${personagens[idx].name} do seu campo.`, '#c84d2a'); personagens[idx] = null; }
+              return { ...prev, personagens };
+            });
+          } else if (tipos.length > 0) {
+            addLog(`[EFEITO] ${carta.name}: ${melhor.magia || melhor.instinto || melhor.encantamento || 'efeito de entrada ativado'}.`, '#c89b3c');
+          }
+        }
       }
     }
 
@@ -892,9 +926,7 @@ export function useBattleState(npc) {
     const slug = folc.slug || '';
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
-    const behaviors = folc.effect_blocks?.flatMap(b =>
-      b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
-    ).filter(Boolean) ?? [];
+    const behaviors = getActionTypes(folc);
 
     if (slug === 'boitata') {
       setCampoNpc(prev => {
@@ -1090,9 +1122,7 @@ export function useBattleState(npc) {
   const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false, pendente = null) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
-    const behaviors = carta.effect_blocks?.flatMap(b =>
-      b.actions?.flatMap(a => a.effect_reference?.map(e => e.behavior_slug) ?? []) ?? []
-    ).filter(Boolean) ?? [];
+    const behaviors = getActionTypes(carta);
 
     if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
       setCampoJogador(prev => ({

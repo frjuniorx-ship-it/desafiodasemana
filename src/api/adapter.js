@@ -8,10 +8,14 @@ function extrairBonusDeEffectBlocks(effect_blocks) {
   let atqBonus = 0, defBonus = 0, pcBonus = 0;
   effect_blocks.forEach(bloco => {
     (bloco.actions || []).forEach(action => {
-      if (['modify_stats', 'modify_attack', 'grant_effect'].includes(action.type)) {
+      if (['modify_attack', 'modify_stats'].includes(action.type)) {
         atqBonus += action.value_attack || 0;
+      }
+      if (['modify_defense', 'modify_stats'].includes(action.type)) {
         defBonus += action.value_defense || 0;
-        pcBonus  += action.value_pc     || 0;
+      }
+      if (action.type === 'gain_pc') {
+        pcBonus += action.value_pc || 0;
       }
     });
   });
