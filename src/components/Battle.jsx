@@ -31,6 +31,7 @@ export default function Battle({ npc, onGameOver, token }) {
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
     folcloricasAtivasJogador, folcloricasAtivasNpc,
+    sapoCururuPendente, setSapoCururuPendente, entrarSaposCururu,
     esquecimentoJogador,
     iniciarJogo,
   } = useBattleState(npc);
@@ -134,6 +135,23 @@ export default function Battle({ npc, onGameOver, token }) {
     }
 
     if (selecaoAlvo) setSelecaoAlvo(null);
+
+    // Intercept: resposta ao prompt do Sapo Cururu
+    if (sapoCururuPendente) {
+      const textNorm = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      const confirmou = /^(confirma|confirmei|sim|busquei|encontrei|coloquei|entrou)/.test(textNorm);
+      const negou = /(nao tem|não tem|sem copia|sem cópia|acabou|nao encontrei|não encontrei|nao ha|não há)/.test(textNorm);
+      if (confirmou) {
+        entrarSaposCururu(sapoCururuPendente.count);
+        addChatMsg('system', `${sapoCururuPendente.count} Sapo(s) Cururu entrou(aram) em campo.`);
+        return;
+      }
+      if (negou) {
+        setSapoCururuPendente(null);
+        addChatMsg('system', 'Nenhum Sapo Cururu adicionado ao campo.');
+        return;
+      }
+    }
 
     const curupiraAtivo = (campoNpc.efeitosGlobais || []).some(e => e.tipo === 'curupira');
     const estado = { turno, nomeNpc: npcName, pcNpc, pcJogador, campoNpc, campoJogador, combatePendente };
@@ -445,6 +463,15 @@ export default function Battle({ npc, onGameOver, token }) {
       registrarResultado(npc._id, 'vitoria', token).catch(console.error);
     }
   }, [fimDeJogo]);
+
+  useEffect(() => {
+    if (!sapoCururuPendente) return;
+    const { count, razao } = sapoCururuPendente;
+    const msg = razao === 'destruicao'
+      ? `Sapo Cururu foi destruído! Busque ${count} sapos no seu baralho. Responda "confirma" se conseguiu, ou "não tem mais cópias" se não houver mais.`
+      : `Sapo Cururu foi removido! Busque ${count} sapo no seu baralho. Responda "confirma" se conseguiu, ou "não tem mais cópias" se não houver mais.`;
+    setChat(prev => [...prev, { kind: 'ia', text: msg }]);
+  }, [sapoCururuPendente]);
 
   return (
     <main style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '8px 14px 0', boxSizing: 'border-box' }}>

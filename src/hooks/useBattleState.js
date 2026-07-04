@@ -114,6 +114,21 @@ function expandirDeck(deckEntradas) {
 
 function toArray(v) { return Array.isArray(v) ? v : v ? [v] : []; }
 
+// Extrai bônus de ATQ/DEF/PC do PRIMEIRO bloco de efeito que conceda bônus.
+// Evita somar entradas duplicadas da API (bug do Bacamarte +2).
+function getEquipBonus(equip) {
+  for (const bloco of (equip.effect_blocks ?? [])) {
+    for (const action of (bloco.actions ?? [])) {
+      if (['modify_stats', 'modify_attack', 'grant_effect'].includes(action.type)) {
+        const atk = action.value_attack || 0;
+        const def = action.value_defense || 0;
+        const pc  = action.value_pc     || 0;
+        if (atk || def || pc) return { atk, def, pc };
+      }
+    }
+  }
+  return { atk: equip.atk ?? 0, def: equip.def ?? 0, pc: equip.pc ?? 0 };
+}
 
 function categoriaParaZona(categoria) {
   if (!categoria) return 'personagens';
@@ -270,6 +285,7 @@ export function useBattleState(npc) {
   const [deckJogadorVazio, setDeckJogadorVazio] = useState(false);
   const [folcloricasAtivasJogador, setFolcloricasAtivasJogador] = useState([]);
   const [folcloricasAtivasNpc, setFolcloricasAtivasNpc] = useState([]);
+  const [sapoCururuPendente, setSapoCururuPendente] = useState(null); // null | { count: 1|2, razao: 'destruicao'|'remocao' }
   const npcComecouRef = useRef(false);
   const npcAutoStartRef = useRef(false);
   const campoJogadorRef = useRef(campoPadrao());
@@ -368,6 +384,9 @@ export function useBattleState(npc) {
       const behaviors = getBehaviors(folc);
       const slug = folc.slug || '';
       if (slug === 'boitata') {
+        if (campoJogador.personagens.some(c => c?.slug === 'sapo-cururu')) {
+          setSapoCururuPendente({ count: 1, razao: 'remocao' });
+        }
         setCampoJogador(prev => {
           const tudo = [
             ...prev.personagens.filter(Boolean).map(c => c.name),
@@ -386,6 +405,9 @@ export function useBattleState(npc) {
           };
         });
       } else if (slug === 'mao-de-cabelo') {
+        if (campoJogador.personagens.some(c => c?.slug === 'sapo-cururu' && c?.atacouNesteTurno)) {
+          setSapoCururuPendente({ count: 1, razao: 'remocao' });
+        }
         setCampoJogador(prev => {
           const personagens = prev.personagens.map(c => {
             if (c?.atacouNesteTurno) { addLog(`[FOLCLÓRICA] ${folc.name}: removeu ${c.name} que atacou.`, '#c84d2a'); return null; }
@@ -394,6 +416,10 @@ export function useBattleState(npc) {
           return { ...prev, personagens };
         });
       } else if (behaviors.includes('remove_card') && slug !== 'iara') {
+        const primeiro = campoJogador.personagens.find(Boolean);
+        if (primeiro?.slug === 'sapo-cururu') {
+          setSapoCururuPendente({ count: 1, razao: 'remocao' });
+        }
         setCampoJogador(prev => {
           const personagens = [...prev.personagens];
           const idx = personagens.findIndex(Boolean);
@@ -442,6 +468,9 @@ export function useBattleState(npc) {
           return { ...prev, personagens };
         });
       } else if (slug === 'iara') {
+        if (campoJogador.personagens.some(c => c?.slug === 'sapo-cururu' && (c?.atk ?? 0) >= 3)) {
+          setSapoCururuPendente({ count: 1, razao: 'remocao' });
+        }
         setCampoJogador(prev => {
           const personagens = prev.personagens.map(c => {
             if (c && (c.atk ?? 0) >= 3) {
@@ -466,6 +495,9 @@ export function useBattleState(npc) {
         setFolcloricasAtivasNpc(prev => [...prev, { carta: folc, nome: folc.name, imagemUrl: folc.imagem_url || '', turnos: 5, turnosMax: 5, efeito: 'homem_do_saco' }]);
         addLog('[EFEITO] O Homem do Saco: você perde 1 PC por turno durante 5 turnos', '#c84d2a');
       } else if (slug === 'saci-perere') {
+        if (campoJogador.personagens.some(c => c?.slug === 'sapo-cururu')) {
+          setSapoCururuPendente({ count: 1, razao: 'remocao' });
+        }
         setCampoJogador(prev => {
           const names = prev.personagens.filter(Boolean).map(c => c.name);
           if (names.length) addLog(`[FOLCLÓRICA] ${folc.name}: devolveu ${names.join(', ')} ao seu baralho (remoção).`, '#c84d2a');
@@ -650,13 +682,14 @@ export function useBattleState(npc) {
         const pi = workCampo.personagens.findIndex(c => c && podeEquipar(equip, c));
         if (pi !== -1) {
           const alvo = workCampo.personagens[pi];
+          const equipBonus = getEquipBonus(equip);
           workCampo.personagens[pi] = {
             ...alvo,
             atkBase: alvo.atkBase ?? alvo.atk ?? 0,
             defBase: alvo.defBase ?? alvo.def ?? 0,
-            atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
-            def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
-            pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+            atk: (alvo.atkBase ?? alvo.atk ?? 0) + equipBonus.atk,
+            def: (alvo.defBase ?? alvo.def ?? 0) + equipBonus.def,
+            pc: (alvo.pc ?? 0) + equipBonus.pc,
             effect_blocks: [...(alvo.effect_blocks ?? []), ...(equip.effect_blocks ?? [])],
             equipamentos: [...(alvo.equipamentos ?? []), equip],
           };
@@ -1236,6 +1269,7 @@ export function useBattleState(npc) {
     if (defensoraDestruida) {
       const pcPerdido = pcPerdidoPorDestruicao(defensoraCard);
       if (npcAtaca) {
+        if (defensoraCard.slug === 'sapo-cururu') setSapoCururuPendente({ count: 2, razao: 'destruicao' });
         setPcJogador(p => Math.max(0, p - pcPerdido - danoAoPC));
         setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c) }));
         addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! Você perde ${pcPerdido + danoAoPC} PC.`, '#c84d2a');
@@ -1305,6 +1339,7 @@ export function useBattleState(npc) {
           setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
           addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! NPC perde ${pcPerdido} PC.`, '#f5d27a');
         } else {
+          if (atacanteCard.slug === 'sapo-cururu') setSapoCururuPendente({ count: 2, razao: 'destruicao' });
           setPcJogador(p => Math.max(0, p - pcPerdido));
           setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
           addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! Você perde ${pcPerdido} PC.`, '#c84d2a');
@@ -1394,13 +1429,14 @@ export function useBattleState(npc) {
         const idx = personagens.findIndex(c => c?.name === alvo.name);
         if (idx === -1) return prev;
         const a = personagens[idx];
+        const equipBonus = getEquipBonus(normalizada);
         personagens[idx] = {
           ...a,
           atkBase: a.atkBase ?? a.atk ?? 0,
           defBase: a.defBase ?? a.def ?? 0,
-          atk: (a.atkBase ?? a.atk ?? 0) + (normalizada.atk ?? 0),
-          def: (a.defBase ?? a.def ?? 0) + (normalizada.def ?? 0),
-          pc: (a.pc ?? 0) + (normalizada.pc ?? 0),
+          atk: (a.atkBase ?? a.atk ?? 0) + equipBonus.atk,
+          def: (a.defBase ?? a.def ?? 0) + equipBonus.def,
+          pc: (a.pc ?? 0) + equipBonus.pc,
           effect_blocks: [...(a.effect_blocks ?? []), ...(normalizada.effect_blocks ?? [])],
           equipamentos: [...(a.equipamentos ?? []), normalizada],
         };
@@ -1482,13 +1518,14 @@ export function useBattleState(npc) {
     setCampoJogador(prev => {
       const personagens = [...prev.personagens];
       const alvo = personagens[idx];
+      const equipBonus = getEquipBonus(equip);
       personagens[idx] = {
         ...alvo,
         atkBase: alvo.atkBase ?? alvo.atk ?? 0,
         defBase: alvo.defBase ?? alvo.def ?? 0,
-        atk: (alvo.atkBase ?? alvo.atk ?? 0) + (equip.atk ?? 0),
-        def: (alvo.defBase ?? alvo.def ?? 0) + (equip.def ?? 0),
-        pc: (alvo.pc ?? 0) + (equip.pc ?? 0),
+        atk: (alvo.atkBase ?? alvo.atk ?? 0) + equipBonus.atk,
+        def: (alvo.defBase ?? alvo.def ?? 0) + equipBonus.def,
+        pc: (alvo.pc ?? 0) + equipBonus.pc,
         effect_blocks: [...(alvo.effect_blocks ?? []), ...(equip.effect_blocks ?? [])],
         equipamentos: [...(alvo.equipamentos ?? []), equip],
       };
@@ -1624,6 +1661,27 @@ export function useBattleState(npc) {
     // NPC auto-start handled by useEffect watching [prontoParaJogar, npcExecutarTurno]
   }, [deckNpc]);
 
+  const entrarSaposCururu = useCallback(async (count) => {
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const { carta: raw } = await buscarCartaFuzzy('sapo cururu');
+    if (!raw) {
+      setLog(prev => [...prev, { t: ts, text: '[SAPO CURURU] Carta não encontrada.', color: '#8ac46a' }]);
+      setSapoCururuPendente(null);
+      return;
+    }
+    const carta = { ...normalizeCardForSlot(raw), entrou_turno_atual: true };
+    setCampoJogador(prev => {
+      const personagens = [...prev.personagens];
+      let adicionados = 0;
+      for (let i = 0; i < personagens.length && adicionados < count; i++) {
+        if (!personagens[i]) { personagens[i] = { ...carta }; adicionados++; }
+      }
+      return { ...prev, personagens };
+    });
+    setLog(prev => [...prev, { t: ts, text: `[SAPO CURURU] ${count} Sapo(s) Cururu entraram em campo!`, color: '#8ac46a' }]);
+    setSapoCururuPendente(null);
+  }, []);
+
   return {
     loading,
     deckNpc, maoNpc, campoNpc, esquecimentoNpc, pcNpc,
@@ -1633,6 +1691,7 @@ export function useBattleState(npc) {
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
     folcloricasAtivasJogador, folcloricasAtivasNpc,
+    sapoCururuPendente, setSapoCururuPendente, entrarSaposCururu,
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
