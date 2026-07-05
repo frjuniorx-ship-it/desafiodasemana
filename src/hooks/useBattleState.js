@@ -65,6 +65,40 @@ function shuffle(arr) {
   return a;
 }
 
+// Garante que keywords (FURIA, ATRAVESSAR, etc.) sejam detectáveis por temKeyword()
+// mesmo que cheguem como mecanica[] ou como action.type sem effect_reference na API.
+function injetarKeywordsNosBlocks(entrada) {
+  const kwdSet = new Set(Object.values(KEYWORDS));
+  const normSlug = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
+  const rawBlocks = toArray(entrada.effect_blocks ?? []);
+
+  // Blocks existentes: se action.type é um keyword slug, garantir effect_reference
+  const normalizedBlocks = rawBlocks.map(bloco => ({
+    ...bloco,
+    actions: (bloco.actions || []).map(action => {
+      const slug = normSlug(action.type || '');
+      if (kwdSet.has(slug) && !(action.effect_reference || []).some(e => e.slug === slug)) {
+        return { ...action, effect_reference: [...(action.effect_reference || []), { slug }] };
+      }
+      return action;
+    }),
+  }));
+
+  // Keywords em mecanica[] não presentes nos blocks → block sintético passivo
+  const jaPresentes = new Set(
+    normalizedBlocks.flatMap(b => (b.actions || []).flatMap(a => (a.effect_reference || []).map(e => e.slug)))
+  );
+  const mecKwds = toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
+    .map(normSlug)
+    .filter(slug => kwdSet.has(slug) && !jaPresentes.has(slug));
+
+  if (mecKwds.length === 0) return normalizedBlocks;
+  return [
+    ...normalizedBlocks,
+    ...mecKwds.map(slug => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug }] }] })),
+  ];
+}
+
 // Unifica os diferentes shapes de carta da API num formato único para os slots.
 // Lida com: deck entries (atq/def/imagem_url), adaptarCarta output (atq/def/imagemUrl),
 // e data.js legacy (atk/def/name/category).
