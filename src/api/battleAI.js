@@ -156,6 +156,11 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'atacar', alvo: limpar(mAtacarInverso[2]), carta: limpar(mAtacarInverso[1]) };
   }
 
+  // "ataco" ou "atacar" sozinho → modo seleção de atacante por clique
+  if (/^(?:atac[oa]|atacar)$/.test(t)) {
+    return { acao: 'selecionar_atacante' };
+  }
+
   // ATACAR SEM ESPECIFICAR CARTA (usa primeiro disponível)
   const mAtacarSimples = t.match(/^(?:atac[oa]|ataquei|ataque)\s+(?:o\s+|a\s+)?(.+)/);
   if (mAtacarSimples) {

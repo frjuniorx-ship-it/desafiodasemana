@@ -45,6 +45,7 @@ export default function Battle({ npc, onGameOver, token }) {
   const [toast, setToast] = useState('');
   const [acoesRapidas, setAcoesRapidas] = useState([]);
   const [selecaoAlvo, setSelecaoAlvo] = useState(null); // null | { atacanteCard }
+  const [modoSelecao, setModoSelecao] = useState('idle'); // 'idle' | 'escolher_atacante'
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
   const sendChatRef = useRef(null);
@@ -92,8 +93,24 @@ export default function Battle({ npc, onGameOver, token }) {
     if (!selecaoAlvo) return;
     const { atacanteCard } = selecaoAlvo;
     setSelecaoAlvo(null);
-    const r = jogadorAtacar(atacanteCard.name, alvoCard.name);
+    const r = jogadorAtacar(atacanteCard.name, alvoCard.name, atacanteCard, alvoCard);
     setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${atacanteCard.name} em ${alvoCard.name}.` : (r.msg || 'Ataque inválido.') }]);
+  }
+
+  function handleSelecionarAtacante(card) {
+    setModoSelecao('idle');
+    const npcPersonagens = campoNpc.personagens.filter(Boolean);
+    if (npcPersonagens.length === 0) {
+      setChat(prev => [...prev, { kind: 'ia', text: `${card.name} pronto! Campo do NPC vazio — diga "ataco direto com ${card.name}".` }]);
+      return;
+    }
+    if (npcPersonagens.length === 1) {
+      const r = jogadorAtacar(card.name, npcPersonagens[0].name, card, npcPersonagens[0]);
+      setChat(prev => [...prev, { kind: 'system', text: r.ok ? `Ataque de ${card.name} em ${npcPersonagens[0].name}.` : (r.msg || 'Ataque inválido.') }]);
+      return;
+    }
+    setSelecaoAlvo({ atacanteCard: card });
+    setChat(prev => [...prev, { kind: 'ia', text: `${card.name} pronto! Clique na carta do NPC que quer atacar.` }]);
   }
 
   function sendChat(textoOverride) {
@@ -135,6 +152,7 @@ export default function Battle({ npc, onGameOver, token }) {
     }
 
     if (selecaoAlvo) setSelecaoAlvo(null);
+    if (modoSelecao !== 'idle') setModoSelecao('idle');
 
     // Intercept: resposta ao prompt do Sapo Cururu
     if (sapoCururuPendente) {
@@ -416,6 +434,16 @@ export default function Battle({ npc, onGameOver, token }) {
           setChat(prev => [...prev, { kind: 'ai', text: 'Não há combate pendente para confirmar.' }]);
         }
         break;
+      case 'selecionar_atacante': {
+        const disponiveis = campoJogador.personagens.filter(c =>
+          c && (!c.entrou_turno_atual || temKeyword(c, KEYWORDS.INVESTIR)) && !c.paralisado && !c.imobilizado && !c.atacouNesteTurno
+        );
+        if (!disponiveis.length) { addChatMsg('ia', 'Nenhuma carta disponível para atacar.'); break; }
+        if (disponiveis.length === 1) { handleSelecionarAtacante(disponiveis[0]); break; }
+        setModoSelecao('escolher_atacante');
+        addChatMsg('ia', `Clique na carta que quer usar para atacar. Disponíveis: ${disponiveis.map(c => c.name).join(', ')}.`);
+        break;
+      }
       default:
         setChat(prev => [...prev, { kind: 'ai', text: 'Ação não reconhecida.' }]);
     }
@@ -473,6 +501,7 @@ export default function Battle({ npc, onGameOver, token }) {
     setChat(prev => [...prev, { kind: 'ia', text: msg }]);
   }, [sapoCururuPendente]);
 
+  console.log('[MODO SELECAO]', modoSelecao);
   return (
     <main style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '8px 14px 0', boxSizing: 'border-box' }}>
       <div className="battle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 14, flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -647,7 +676,10 @@ export default function Battle({ npc, onGameOver, token }) {
               <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateRows: '1fr 1fr', gap: 8, overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
                   {campoJogador.personagens.map((carta, i) => (
-                    <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom} />
+                    <CharSlot key={i} card={carta} side="player" onZoom={zoomCard} onZoomOut={clearZoom}
+                      selectable={modoSelecao === 'escolher_atacante' && !!carta && (!carta.entrou_turno_atual || temKeyword(carta, KEYWORDS.INVESTIR)) && !carta.paralisado && !carta.imobilizado && !carta.atacouNesteTurno}
+                      onSelect={modoSelecao === 'escolher_atacante' ? handleSelecionarAtacante : undefined}
+                    />
                   ))}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6, height: '100%', minHeight: 0, overflow: 'hidden' }}>
@@ -738,6 +770,19 @@ export default function Battle({ npc, onGameOver, token }) {
               <div ref={chatRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {chat.map((m, i) => <ChatBubble key={i} msg={m} />)}
               </div>
+              {modoSelecao === 'escolher_atacante' && (
+                <div style={{ display: 'flex', gap: 6, padding: '6px 8px', flexShrink: 0, borderTop: '1px solid rgba(245,210,122,.25)', background: 'rgba(90,138,74,.08)', alignItems: 'center' }}>
+                  <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, color: '#8ac46a', letterSpacing: '.12em', flex: 1 }}>
+                    ⚔️ CLIQUE NA CARTA QUE VAI ATACAR
+                  </div>
+                  <button
+                    onClick={() => setModoSelecao('idle')}
+                    style={{ padding: '4px 10px', borderRadius: 5, fontSize: 9, cursor: 'pointer', fontFamily: "'Cinzel', serif", letterSpacing: '.1em', background: 'rgba(200,77,42,.2)', border: '1px solid #c84d2a', color: '#c84d2a' }}
+                  >
+                    CANCELAR
+                  </button>
+                </div>
+              )}
               {selecaoAlvo && (
                 <div style={{ display: 'flex', gap: 6, padding: '6px 8px', flexShrink: 0, borderTop: '1px solid rgba(245,210,122,.25)', background: 'rgba(245,210,122,.06)', alignItems: 'center' }}>
                   <div style={{ fontFamily: "'Cinzel', serif", fontSize: 9, color: '#f5d27a', letterSpacing: '.12em', flex: 1 }}>

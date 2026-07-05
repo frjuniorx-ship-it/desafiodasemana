@@ -841,8 +841,12 @@ export function useBattleState(npc) {
           const alvo = candidatos.slice().sort((a, b) => (a.def ?? 0) - (b.def ?? 0))[0];
           // FURIA: armazenar ATQ com bônus no objeto atacante para resolverCombateCompleto
           const furiaBonus = atkEfetivo - (atk.atk ?? 0);
-          const atacanteParaCombate = furiaBonus > 0 ? { ...atk, atk: atkEfetivo, furiaBonus } : atk;
-          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo, atacante: atacanteParaCombate, alvo });
+          const atkIdx = workCampo.personagens.findIndex(c => c === atk);
+          const alvoIdx = campoJogador.personagens.findIndex(c => c === alvo);
+          const atacanteParaCombate = furiaBonus > 0
+            ? { ...atk, atk: atkEfetivo, furiaBonus, _fieldIdx: atkIdx }
+            : { ...atk, _fieldIdx: atkIdx };
+          setCombatePendente({ atacanteNome: atk.name, alvoNome: alvo.name, dano: atkEfetivo, atacante: atacanteParaCombate, alvo: { ...alvo, _fieldIdx: alvoIdx } });
           addLog(`[COMBATE] ${atk.name} atacou ${alvo.name} — confirme ou responda com carta`, '#c84d2a');
           break; // aguarda confirmação antes de continuar ataques
         } else {
@@ -1286,6 +1290,8 @@ export function useBattleState(npc) {
   const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
+    // Identifica o slot por índice quando disponível; evita afetar cópias com o mesmo nome
+    const matchSlot = (card) => (c, i) => card._fieldIdx !== undefined ? i === card._fieldIdx : c?.name === card.name;
     const atkA = atacanteCard.atk ?? 0;
     if (atacanteCard.furiaBonus > 0) {
       addLog(`[FÚRIA] ${atacanteCard.name} +${atacanteCard.furiaBonus} ATQ de bônus (FÚRIA).`, '#d4a857');
@@ -1301,18 +1307,18 @@ export function useBattleState(npc) {
       if (npcAtaca) {
         if (defensoraCard.slug === 'sapo-cururu') setSapoCururuPendente({ count: 2, razao: 'destruicao' });
         setPcJogador(p => Math.max(0, p - pcPerdido - danoAoPC));
-        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c) }));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? null : c) }));
         addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! Você perde ${pcPerdido + danoAoPC} PC.`, '#c84d2a');
       } else {
         setPcNpc(p => Math.max(0, p - pcPerdido - danoAoPC));
-        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? null : c) }));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? null : c) }));
         addLog(`[COMBATE] ${atacanteCard.name} destruiu ${defensoraCard.name}! NPC perde ${pcPerdido + danoAoPC} PC.`, '#f5d27a');
       }
       if (temVeneno) {
         if (npcAtaca) {
-          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? null : c) }));
         } else {
-          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? null : c) }));
         }
         addLog(`[VENENO] ${defensoraCard.name} envenenou ${atacanteCard.name} — removido sem PC.`, '#8a4a8a');
       }
@@ -1320,10 +1326,10 @@ export function useBattleState(npc) {
       const temRegenerar = temKeyword(defensoraCard, KEYWORDS.REGENERAR);
       const novaDefD = temRegenerar ? (defensoraCard.defBase ?? defensoraCard.def ?? 0) : defD - atkA;
       if (npcAtaca) {
-        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
         if (temRegenerar) addLog(`[REGENERAR] ${defensoraCard.name} regenerou DEF imediatamente.`, '#8ac46a');
       } else {
-        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, defAtual: novaDefD, defReduzidaTurno: !temRegenerar } : c) }));
         if (temRegenerar) addLog(`[REGENERAR] ${defensoraCard.name} regenerou DEF imediatamente.`, '#f5d27a');
       }
     }
@@ -1331,10 +1337,10 @@ export function useBattleState(npc) {
     // ARRUINAR — defensor sobreviveu: setar arruinada (regra ARRUINAR)
     if (!defensoraDestruida && temKeyword(atacanteCard, KEYWORDS.ARRUINAR)) {
       if (npcAtaca) {
-        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, arruinada: true } : c) }));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, arruinada: true } : c) }));
         addLog(`[ARRUINAR] ${defensoraCard.name} foi arruinada — não pode ser substituída.`, '#c84d2a');
       } else {
-        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, arruinada: true } : c) }));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, arruinada: true } : c) }));
         addLog(`[ARRUINAR] ${defensoraCard.name} foi arruinada — não pode ser substituída.`, '#f5d27a');
       }
     }
@@ -1342,10 +1348,10 @@ export function useBattleState(npc) {
     // IMOBILIZAR — defensor sobreviveu: setar imobilizado (regra IMOBILIZAR)
     if (!defensoraDestruida && temKeyword(atacanteCard, KEYWORDS.IMOBILIZAR)) {
       if (npcAtaca) {
-        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, imobilizado: true } : c) }));
+        setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, imobilizado: true } : c) }));
         addLog(`[IMOBILIZAR] ${defensoraCard.name} foi imobilizada — não pode atacar.`, '#c84d2a');
       } else {
-        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === defensoraCard.name ? { ...c, imobilizado: true } : c) }));
+        setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(defensoraCard)(c, i) ? { ...c, imobilizado: true } : c) }));
         addLog(`[IMOBILIZAR] ${defensoraCard.name} foi imobilizada — não pode atacar.`, '#f5d27a');
       }
     }
@@ -1366,20 +1372,20 @@ export function useBattleState(npc) {
         const pcPerdido = pcPerdidoPorDestruicao(atacanteCard);
         if (npcAtaca) {
           setPcNpc(p => Math.max(0, p - pcPerdido));
-          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? null : c) }));
           addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! NPC perde ${pcPerdido} PC.`, '#f5d27a');
         } else {
           if (atacanteCard.slug === 'sapo-cururu') setSapoCururuPendente({ count: 2, razao: 'destruicao' });
           setPcJogador(p => Math.max(0, p - pcPerdido));
-          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? null : c) }));
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? null : c) }));
           addLog(`[CONTRA-ATAQUE] ${defensoraCard.name} destruiu ${atacanteCard.name}! Você perde ${pcPerdido} PC.`, '#c84d2a');
         }
       } else if (atkD > 0) {
         const novaDefA = defA - atkD;
         if (npcAtaca) {
-          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
+          setCampoNpc(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
         } else {
-          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map(c => c?.name === atacanteCard.name ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
+          setCampoJogador(prev => ({ ...prev, personagens: prev.personagens.map((c, i) => matchSlot(atacanteCard)(c, i) ? { ...c, defAtual: novaDefA, defReduzidaTurno: true } : c) }));
         }
       }
     }
@@ -1566,7 +1572,7 @@ export function useBattleState(npc) {
     return { ok: true, equipNome: equip.name, alvoNome };
   }, [campoJogador]);
 
-  const jogadorAtacar = useCallback((nomeAtacante, nomeAlvo) => {
+  const jogadorAtacar = useCallback((nomeAtacante, nomeAlvo, refAtacante = null, refAlvo = null) => {
     const campoCurrent = campoJogadorRef.current;
     const buscarNoCampo = (campo, nome) => campo.personagens.reduce((best, c) => {
       if (!c) return best;
@@ -1575,16 +1581,16 @@ export function useBattleState(npc) {
       return sim > (best?.sim ?? 0) ? { c, sim } : best;
     }, null)?.c;
 
-    const atacante = nomeAtacante
+    const atacante = refAtacante ?? (nomeAtacante
       ? buscarNoCampo(campoCurrent, nomeAtacante)
-      : campoCurrent.personagens.find(c => c && !c.entrou_turno_atual);
+      : campoCurrent.personagens.find(c => c && !c.entrou_turno_atual));
     if (!atacante) return { ok: false, msg: `"${nomeAtacante}" não está em campo.` };
     if (!podeAtacar(atacante)) return { ok: false, msg: `${atacante.name} não pode atacar este turno (entrou agora).` };
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
     if (atacante.atacouNesteTurno) return { ok: false, msg: `${atacante.name} já atacou neste turno (regra 26.0).` };
 
-    const alvo = nomeAlvo ? buscarNoCampo(campoNpc, nomeAlvo) : null;
+    const alvo = refAlvo ?? (nomeAlvo ? buscarNoCampo(campoNpc, nomeAlvo) : null);
     if (!alvo) return { ok: false, msg: `"${nomeAlvo}" não encontrado no campo do NPC.` };
 
     // ATRAIR: forçar alvo com ATRAIR se existir (regra ATRAIR)
@@ -1600,17 +1606,22 @@ export function useBattleState(npc) {
     // FURIA: aplicar bônus de ATQ antes do combate (regra FÚRIA)
     const totalEmCampo = campoCurrent.personagens.filter(Boolean).length;
     const furiaBonus = calcularFuria(atacante, totalEmCampo);
-    const atacanteParaCombate = furiaBonus > 0 ? { ...atacante, atk: (atacante.atk ?? 0) + furiaBonus, furiaBonus } : atacante;
+    // _fieldIdx: identifica o slot exato — evita afetar cópias com o mesmo nome
+    const atacanteIdx = campoCurrent.personagens.findIndex(c => c === atacante);
+    const alvoIdx = campoNpc.personagens.findIndex(c => c === alvo);
+    const atacanteParaCombate = furiaBonus > 0
+      ? { ...atacante, atk: (atacante.atk ?? 0) + furiaBonus, furiaBonus, _fieldIdx: atacanteIdx }
+      : { ...atacante, _fieldIdx: atacanteIdx };
 
-    resolverCombateCompleto(atacanteParaCombate, alvo, false);
+    resolverCombateCompleto(atacanteParaCombate, { ...alvo, _fieldIdx: alvoIdx }, false);
     // Atualiza ref imediatamente para bloquear duplo-ataque na mesma rodada (regra 26.0)
     campoJogadorRef.current = {
       ...campoCurrent,
-      personagens: campoCurrent.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+      personagens: campoCurrent.personagens.map((c, i) => i === atacanteIdx ? { ...c, atacouNesteTurno: true } : c),
     };
     setCampoJogador(prev => ({
       ...prev,
-      personagens: prev.personagens.map(c => c?.name === atacante.name ? { ...c, atacouNesteTurno: true } : c),
+      personagens: prev.personagens.map((c, i) => i === atacanteIdx ? { ...c, atacouNesteTurno: true } : c),
     }));
     return { ok: true, atacanteNome: atacante.name, alvoNome: alvo.name };
   }, [campoNpc, resolverCombateCompleto]);
