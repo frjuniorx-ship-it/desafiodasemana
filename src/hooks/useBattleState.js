@@ -1617,11 +1617,11 @@ export function useBattleState(npc) {
     // Atualiza ref imediatamente para bloquear duplo-ataque na mesma rodada (regra 26.0)
     campoJogadorRef.current = {
       ...campoCurrent,
-      personagens: campoCurrent.personagens.map((c, i) => i === atacanteIdx ? { ...c, atacouNesteTurno: true } : c),
+      personagens: campoCurrent.personagens.map((c, i) => i === atacanteIdx && c ? { ...c, atacouNesteTurno: true } : c),
     };
     setCampoJogador(prev => ({
       ...prev,
-      personagens: prev.personagens.map((c, i) => i === atacanteIdx ? { ...c, atacouNesteTurno: true } : c),
+      personagens: prev.personagens.map((c, i) => i === atacanteIdx && c ? { ...c, atacouNesteTurno: true } : c),
     }));
     return { ok: true, atacanteNome: atacante.name, alvoNome: alvo.name };
   }, [campoNpc, resolverCombateCompleto]);

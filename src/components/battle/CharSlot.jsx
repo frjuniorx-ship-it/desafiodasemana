@@ -23,7 +23,7 @@ export default function CharSlot({ card, side, selected, attacking, selectable, 
     background = side === 'npc' ? 'linear-gradient(180deg, #3a2010, #221212)' : background;
   }
 
-  const initial = card ? (card.name[0] || '?').toUpperCase() : '';
+  const initial = card ? ((card.name?.[0]) || '?').toUpperCase() : '';
 
   return (
     <div
