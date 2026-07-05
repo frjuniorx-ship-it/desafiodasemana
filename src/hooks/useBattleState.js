@@ -86,7 +86,7 @@ function normalizeCardForSlot(entrada) {
     effect:     effectText,
     wp_id:      entrada.wp_id ?? null,
     slug:       entrada.slug  ?? null,
-    nd:         entrada.nd ?? entrada.numero_descarte ?? null,
+    nd:         entrada.nd || entrada.numero_descarte || null,
     mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
     classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
     effect_blocks: toArray(entrada.effect_blocks ?? []),
@@ -772,7 +772,7 @@ export function useBattleState(npc) {
 
       if (candidatas.length > 0) {
         const { carta: folc } = candidatas[0];
-        const nd = folc.nd ?? folc.numero_descarte ?? 0;
+        const nd = folc.nd || folc.numero_descarte || 0;
         const fodder = workMao.filter(c => c !== folc && podeSerDescartada(c)).slice(0, nd);
         if (fodder.length > 0)
           addLog(`[NPC] Descarta ${fodder.map(c => c.name).join(', ')} para ativar ${folc.name}`, '#e8a890');
@@ -1120,7 +1120,8 @@ export function useBattleState(npc) {
       addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
       return;
     }
-    addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || 'efeito ativado'}.`, '#c89b3c');
+    console.warn('[executarEfeitoFolclorica] nenhum handler para slug:', slug, '| behaviors:', behaviors, '| nome:', folc.name);
+    addLog(`[FOLCLÓRICA] ${folc.name}: ${folc.magia || folc.combo_habilidade || folc.instinto || folc.encantamento || 'efeito ativado'}.`, '#c89b3c');
   }, [campoNpc, esquecimentoNpc]);
 
   const jogadorExecutarEfeitoPlanta = useCallback((carta, emResposta = false, pendente = null) => {
@@ -1396,7 +1397,7 @@ export function useBattleState(npc) {
   const jogadorIniciarFolclorica = useCallback(async (nomeFolc) => {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeFolc);
     if (!raw) return { ok: false, sugestao, msg: `Folclórica "${nomeFolc}" não encontrada.` };
-    console.log('[FOLCLORICA] carta encontrada:', raw?.nome, '| nd:', raw?.nd, '| numero_descarte:', raw?.numero_descarte);
+    console.log('[FOLCLORICA] carta encontrada:', raw?.nome, '| nd:', raw?.nd, '| numero_descarte:', raw?.numero_descarte, '| slug:', raw?.slug, '| effect_blocks:', JSON.stringify(raw?.effect_blocks?.slice(0,2)));
     const folc = normalizeCardForSlot(raw);
     const nd = folc.nd ?? 0;
     console.log('[FOLCLORICA] nd após normalização:', nd);
