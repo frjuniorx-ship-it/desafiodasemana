@@ -1324,9 +1324,11 @@ export function useBattleState(npc) {
       return null; // limpa combatePendente — combate resolve abaixo
     });
     // Auto-resolver combate com stats atualizados (planta foi a resposta do jogador)
+    // resolverCombateCompleto não entra nos deps: é estável (deps=[]) e está declarado após
+    // este callback — incluí-lo causaria TDZ na inicialização do componente.
     if (atacanteSnap) resolverCombateCompleto(atacanteSnap, alvoSnap, true);
     return { sucesso: true };
-  }, [resolverCombateCompleto]);
+  }, []);
 
   const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
