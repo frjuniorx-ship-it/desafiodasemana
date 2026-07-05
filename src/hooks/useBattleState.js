@@ -123,7 +123,7 @@ function normalizeCardForSlot(entrada) {
     nd:         entrada.nd || entrada.numero_descarte || null,
     mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
     classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
-    effect_blocks: toArray(entrada.effect_blocks ?? []),
+    effect_blocks: injetarKeywordsNosBlocks(entrada),
     magia:            entrada.magia              ?? null,
     combo_habilidade: entrada.combo_habilidade   ?? null,
     entrou_turno_atual: false,
@@ -1546,22 +1546,29 @@ export function useBattleState(npc) {
   }, [narracaoJogador]);
 
   const jogadorRevelarPlanta = useCallback(async (nomeCarta, slotIndex) => {
+    const ocultaIdxs = campoJogador.plantas
+      .map((p, i) => (p?.oculta ? i : -1))
+      .filter(i => i !== -1);
+
+    if (ocultaIdxs.length === 0) {
+      return { ok: false, msg: 'Não há plantas viradas no campo para revelar. Use "coloco uma planta em campo" para jogar virada primeiro.' };
+    }
+    if (slotIndex === undefined && ocultaIdxs.length > 1) {
+      return { ok: false, needsSlot: true, slots: ocultaIdxs, nomeCarta };
+    }
+
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeCarta);
     if (!raw) return { ok: false, sugestao };
     const normalizada = normalizeCardForSlot(raw);
+    const targetIdx = slotIndex !== undefined ? slotIndex : ocultaIdxs[0];
     setCampoJogador(prev => {
       const plantas = [...prev.plantas];
-      if (slotIndex !== undefined && plantas[slotIndex]?.oculta) {
-        plantas[slotIndex] = { ...normalizada, oculta: false };
-        return { ...prev, plantas };
-      }
-      const idx = plantas.findIndex(c => c?.oculta);
-      if (idx === -1) return prev;
-      plantas[idx] = { ...normalizada, oculta: false };
+      if (!plantas[targetIdx]?.oculta) return prev;
+      plantas[targetIdx] = { ...normalizada, oculta: false };
       return { ...prev, plantas };
     });
     return { ok: true, carta: normalizada };
-  }, []);
+  }, [campoJogador]);
 
   const jogadorJogarPlantaVirada = useCallback(() => {
     const temSlot = campoJogador.plantas.includes(null);

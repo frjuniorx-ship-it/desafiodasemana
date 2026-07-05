@@ -186,10 +186,15 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     };
   }
 
-  // REVELAR PLANTA — "3 espaço de planta revelo capim limão" ou só "revelo capim limão"
+  // REVELAR PLANTA — "3 espaço de planta revelo capim limão", "revelo capim limão no slot 2", ou só "revelo capim limão"
   const mRevelarComSlot = t.match(/^(\d+)[°ºo]?\s+(?:espaco|slot|posic[ao]o?)(?:\s+de\s+planta)?\s+(?:rev[ei]l[oa]?|descubr[oa])\s+(?:a\s+planta\s+|o\s+|a\s+)?(.+)/);
   if (mRevelarComSlot) {
     return { acao: 'revelar_planta', carta: limpar(mRevelarComSlot[2]), slot: parseInt(mRevelarComSlot[1]) - 1 };
+  }
+  // "revelo [nome] no slot N" ou "revelo [nome] slot N"
+  const mRevelarNomeSlot = t.match(/(?:rev[ei]l[oa]?|revela[nr]?|descubr[oa])\s+(?:a\s+planta\s+|o\s+|a\s+)?(.+?)\s+(?:no\s+slot|slot|na\s+posic[ao]o?)\s+(\d+)/);
+  if (mRevelarNomeSlot) {
+    return { acao: 'revelar_planta', carta: limpar(mRevelarNomeSlot[1]), slot: parseInt(mRevelarNomeSlot[2]) - 1 };
   }
   const mRevelar = t.match(/(?:rev[ei]l[oa]?|revela[nr]?|descubr[oa])\s+(?:a\s+planta\s+|o\s+|a\s+)?(.+)/);
   if (mRevelar) {

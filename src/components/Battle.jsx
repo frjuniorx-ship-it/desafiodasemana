@@ -310,8 +310,11 @@ export default function Battle({ npc, onGameOver, token }) {
             } else {
               jogadorExecutarEfeitoPlanta(r.carta, !!combatePendente, combatePendente);
             }
+          } else if (r.needsSlot) {
+            const slotsStr = r.slots.map(i => `slot ${i + 1}`).join(' ou ');
+            addChatMsg('ia', `Você tem ${r.slots.length} plantas viradas no campo. Qual revelar como "${r.nomeCarta}"? Especifique o slot: ${slotsStr}. Ex: "revelo ${r.nomeCarta} no slot 1".`);
           } else {
-            setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+            setChat(prev => [...prev, { kind: 'system', text: r.sugestao ? `Você quis dizer "${r.sugestao}"?` : r.msg || `Carta "${resultado.carta}" não encontrada.` }]);
           }
         });
         break;
