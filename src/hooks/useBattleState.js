@@ -88,9 +88,10 @@ function injetarKeywordsNosBlocks(entrada) {
   const jaPresentes = new Set(
     normalizedBlocks.flatMap(b => (b.actions || []).flatMap(a => (a.effect_reference || []).map(e => e.slug)))
   );
+  // API pode enviar mecanica como string "INVESTIR·FURIA" ou "INVESTIR, FURIA" — dividir antes de checar
   const mecKwds = toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
-    .map(normSlug)
-    .filter(slug => kwdSet.has(slug) && !jaPresentes.has(slug));
+    .flatMap(m => String(m || '').split(/[,;·\s]+/).map(s => normSlug(s.trim())))
+    .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug));
 
   if (mecKwds.length === 0) return normalizedBlocks;
   return [
@@ -1291,11 +1292,16 @@ export function useBattleState(npc) {
     const carta = normalizeCardForSlot(raw);
     const atqBonus = carta.atk || 0;
     const defBonus = carta.def || 0;
+    // Captura snapshots dentro do updater (estado garantidamente atual)
+    let atacanteSnap = null;
+    let alvoSnap = null;
     setCombatePendente(prevCombate => {
       if (!prevCombate) {
         addLog(`[PLANTA] ${carta.name} revelada (sem combate pendente).`);
-        return prevCombate;
+        return null;
       }
+      atacanteSnap = prevCombate.atacante;
+      alvoSnap = prevCombate.alvo;
       const alvoNome = prevCombate.alvo?.name || prevCombate.alvo?.nome || prevCombate.alvoNome;
       if (alvoNome && (atqBonus || defBonus)) {
         setCampoJogador(prevCampo => ({
@@ -1307,20 +1313,20 @@ export function useBattleState(npc) {
           ),
         }));
         addLog(`[PLANTA] ${carta.name} ativada — ${alvoNome} recebe +${atqBonus}/+${defBonus}.`);
-        return {
-          ...prevCombate,
-          alvo: {
-            ...prevCombate.alvo,
-            atk: (prevCombate.alvo?.atk || 0) + atqBonus,
-            def: (prevCombate.alvo?.def || 0) + defBonus,
-          },
+        alvoSnap = {
+          ...prevCombate.alvo,
+          atk: (prevCombate.alvo?.atk || 0) + atqBonus,
+          def: (prevCombate.alvo?.def || 0) + defBonus,
         };
+      } else {
+        addLog(`[PLANTA] ${carta.name} ativada.`);
       }
-      addLog(`[PLANTA] ${carta.name} ativada.`);
-      return prevCombate;
+      return null; // limpa combatePendente — combate resolve abaixo
     });
+    // Auto-resolver combate com stats atualizados (planta foi a resposta do jogador)
+    if (atacanteSnap) resolverCombateCompleto(atacanteSnap, alvoSnap, true);
     return { sucesso: true };
-  }, []);
+  }, [resolverCombateCompleto]);
 
   const resolverCombateCompleto = useCallback((atacanteCard, defensoraCard, npcAtaca = true) => {
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
