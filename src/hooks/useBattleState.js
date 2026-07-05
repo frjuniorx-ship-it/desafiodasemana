@@ -1653,15 +1653,11 @@ export function useBattleState(npc) {
     if (alvoProtegerNpc && alvo.name !== alvoProtegerNpc.name) {
       return { ok: false, msg: `${alvoProtegerNpc.name} tem PROTEGER — você deve atacar esta carta protetora primeiro.` };
     }
-    // FURIA: aplicar bônus de ATQ antes do combate (regra FÚRIA)
-    const totalEmCampo = campoCurrent.personagens.filter(Boolean).length;
-    const furiaBonus = calcularFuria(atacante, totalEmCampo);
     // _fieldIdx: identifica o slot exato — evita afetar cópias com o mesmo nome
+    // FURIA já está persistido em atacante.atk e atacante.furiaBonus via useEffect de campo
     const atacanteIdx = campoCurrent.personagens.findIndex(c => c === atacante);
     const alvoIdx = campoNpc.personagens.findIndex(c => c === alvo);
-    const atacanteParaCombate = furiaBonus > 0
-      ? { ...atacante, atk: (atacante.atk ?? 0) + furiaBonus, furiaBonus, _fieldIdx: atacanteIdx }
-      : { ...atacante, _fieldIdx: atacanteIdx };
+    const atacanteParaCombate = { ...atacante, _fieldIdx: atacanteIdx };
 
     resolverCombateCompleto(atacanteParaCombate, { ...alvo, _fieldIdx: alvoIdx }, false);
     // Atualiza ref imediatamente para bloquear duplo-ataque na mesma rodada (regra 26.0)
@@ -1689,8 +1685,8 @@ export function useBattleState(npc) {
     if (atacante.paralisado) return { ok: false, msg: `${atacante.name} está paralisado e não pode atacar (regra 27.0).` };
     if (atacante.imobilizado) return { ok: false, msg: `${atacante.name} está imobilizado e não pode atacar (regra 40.3).` };
     if (atacante.atacouNesteTurno) return { ok: false, msg: `${atacante.name} já atacou neste turno (regra 26.0).` };
-    const totalEmCampo = campoCurrent.personagens.filter(Boolean).length;
-    const dano = (atacante.atk ?? 0) + calcularFuria(atacante, totalEmCampo);
+    // FURIA já está em atacante.atk via useEffect de campo
+    const dano = atacante.atk ?? 0;
     setPcNpc(p => Math.max(0, p - dano));
     setLog(prev => [...prev, { t: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), text: `[COMBATE DIRETO] ${atacante.name} causou ${dano} de dano direto ao NPC!`, color: '#f5d27a' }]);
     campoJogadorRef.current = {
@@ -1774,6 +1770,30 @@ export function useBattleState(npc) {
     setLog(prev => [...prev, { t: ts, text: `[SAPO CURURU] ${count} Sapo(s) Cururu entraram em campo!`, color: '#8ac46a' }]);
     setSapoCururuPendente(null);
   }, []);
+
+  // Aplica/remove bônus FURIA permanentemente no atk da carta sempre que o campo muda.
+  // Usa furiaBonus na carta para não acumular bônus a cada re-render.
+  useEffect(() => {
+    const personagens = campoJogador.personagens;
+    const total = personagens.filter(Boolean).length;
+    const needsUpdate = personagens.some(c => {
+      if (!c || !temKeyword(c, KEYWORDS.FURIA)) return false;
+      return (c.furiaBonus ?? 0) !== calcularFuria(c, total);
+    });
+    if (!needsUpdate) return;
+    setCampoJogador(prev => {
+      const tot = prev.personagens.filter(Boolean).length;
+      return {
+        ...prev,
+        personagens: prev.personagens.map(c => {
+          if (!c || !temKeyword(c, KEYWORDS.FURIA)) return c;
+          const base = (c.atk ?? 0) - (c.furiaBonus ?? 0);
+          const novoBonus = calcularFuria(c, tot);
+          return { ...c, atk: base + novoBonus, furiaBonus: novoBonus };
+        }),
+      };
+    });
+  }, [campoJogador.personagens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     loading,
