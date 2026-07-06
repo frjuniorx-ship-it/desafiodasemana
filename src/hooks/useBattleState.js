@@ -145,8 +145,12 @@ function normalizeCardForSlot(entrada) {
     wp_id:      entrada.wp_id ?? null,
     slug:       entrada.slug  ?? null,
     nd:         entrada.nd || entrada.numero_descarte || null,
-    mecanica:     toArray(entrada.mecanica     ?? entrada.mecanicas ?? []),
-    classes:      toArray(entrada.classe       ?? entrada.classes   ?? []),
+    mecanica:     toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
+                    .map(m => typeof m === 'string' ? m : (m?.slug || m?.name || m?.display_name || ''))
+                    .filter(Boolean),
+    classes:      toArray(entrada.classe ?? entrada.classes ?? [])
+                    .map(c => typeof c === 'string' ? c : (c?.slug || c?.name || c?.display_name || ''))
+                    .filter(Boolean),
     effect_blocks: injetarKeywordsNosBlocks(entrada),
     magia:            entrada.magia              ?? null,
     combo_habilidade: entrada.combo_habilidade   ?? null,
