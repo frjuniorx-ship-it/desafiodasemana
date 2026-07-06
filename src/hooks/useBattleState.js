@@ -199,7 +199,10 @@ function getEquipBonus(equip) {
 
 function getActionTypes(carta) {
   return (carta.effect_blocks || [])
-    .flatMap(b => (b.actions || []).map(a => a.type))
+    .flatMap(b => (b.actions || []).flatMap(a => [
+      a.type,
+      ...(a.effect_reference || []).map(e => e.slug).filter(Boolean),
+    ]))
     .filter(t => t && t !== 'none');
 }
 
@@ -618,11 +621,18 @@ export function useBattleState(npc) {
     const executarEfeitoPlantaNpc = (carta) => {
       const behaviors = getBehaviors(carta);
       if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
-        setCampoNpc(prev => ({
-          ...prev,
-          personagens: prev.personagens.map(c => c ? { ...c, paralisado: false, imobilizado: false, arruinada: false } : null),
-        }));
-        addLog(`[PLANTA] ${carta.name}: removeu encantamentos do campo NPC.`, '#8ac46a');
+        setCampoJogador(prev => {
+          const plantas = [...prev.plantas];
+          const idx = plantas.findIndex(Boolean);
+          if (idx === -1) {
+            addLog(`[PLANTA] ${carta.name}: você não tem plantas em campo — sem efeito.`, '#8ac46a');
+            return prev;
+          }
+          const nome = plantas[idx]?.name;
+          plantas[idx] = null;
+          addLog(`[PLANTA] ${carta.name}: removeu ${nome && nome !== '???' ? nome : 'uma planta'} do seu campo.`, '#c84d2a');
+          return { ...prev, plantas };
+        });
       } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
         setCampoJogador(prev => ({ ...prev, acao: null }));
         addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo adversário.`, '#8ac46a');
@@ -1199,11 +1209,18 @@ export function useBattleState(npc) {
     const behaviors = getActionTypes(carta);
 
     if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
-      setCampoJogador(prev => ({
-        ...prev,
-        personagens: prev.personagens.map(c => c ? { ...c, paralisado: false, imobilizado: false } : null),
-      }));
-      addLog(`[PLANTA] ${carta.name}: removeu encantamentos do seu campo.`, '#8ac46a');
+      setCampoNpc(prev => {
+        const plantas = [...prev.plantas];
+        const idx = plantas.findIndex(Boolean);
+        if (idx === -1) {
+          addLog(`[PLANTA] ${carta.name}: NPC não tem plantas em campo — sem efeito.`, '#8ac46a');
+          return prev;
+        }
+        const nome = plantas[idx]?.name;
+        plantas[idx] = null;
+        addLog(`[PLANTA] ${carta.name}: removeu ${nome && nome !== '???' ? nome : 'uma planta'} do campo do NPC.`, '#8ac46a');
+        return { ...prev, plantas };
+      });
     } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
       setCampoNpc(prev => ({ ...prev, acao: null }));
       addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo do NPC.`, '#8ac46a');

@@ -344,9 +344,18 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'ativar_planta': {
-        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao }) => {
-          if (carta) setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado.` }]);
-          else setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+        const combatePendenteSnap = combatePendente;
+        jogadorJogarCarta(resultado.carta).then(({ carta, sugestao, limitExceeded, tipo, limite }) => {
+          if (limitExceeded) {
+            addChatMsg('ai', `Limite atingido: apenas ${limite} carta(s) do tipo "${tipo}" por turno (regra 20.0).`);
+            return;
+          }
+          if (carta) {
+            setChat(prev => [...prev, { kind: 'system', text: `${carta.name} ativado.` }]);
+            jogadorExecutarEfeitoPlanta(carta, !!combatePendenteSnap, combatePendenteSnap);
+          } else {
+            setChat(prev => [...prev, { kind: 'system', text: sugestao ? `Você quis dizer "${sugestao}"?` : `Carta "${resultado.carta}" não encontrada.` }]);
+          }
         });
         break;
       }
