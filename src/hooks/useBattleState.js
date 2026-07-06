@@ -72,6 +72,15 @@ function injetarKeywordsNosBlocks(entrada) {
   const normSlug = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
   const rawBlocks = toArray(entrada.effect_blocks ?? []);
 
+  // Diagnóstico: exibe shape real dos dados para cartas com mecanica (remover após confirmar)
+  const nomeCarta = entrada.nome ?? entrada.name ?? '';
+  if ((entrada.mecanica?.length || entrada.mecanicas?.length) && rawBlocks.length > 0) {
+    console.log('[INJECT] carta:', nomeCarta,
+      '| mecanica[0]:', JSON.stringify(entrada.mecanica?.[0] ?? entrada.mecanicas?.[0]),
+      '| block[0].actions[0]:', JSON.stringify(rawBlocks[0]?.actions?.[0])
+    );
+  }
+
   // Blocks existentes: normalizar slugs de effect_reference E garantir que action.type keyword
   // tenha effect_reference. Normalizar slugs resolve casos como API enviando 'fúria' vs 'furia'.
   const normalizedBlocks = rawBlocks.map(bloco => ({
