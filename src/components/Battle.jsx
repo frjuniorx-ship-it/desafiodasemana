@@ -27,6 +27,7 @@ export default function Battle({ npc, onGameOver, token }) {
     passarVez, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
+    jogadorAtivarKeyword,
     folcloricaPendente,
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
@@ -323,6 +324,16 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!validarLimiteTurno('planta')) break;
         const r = jogadorJogarPlantaVirada();
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? 'Planta colocada em campo (virada).' : r.msg }]);
+        break;
+      }
+      case 'ativar_keyword': {
+        jogadorAtivarKeyword(resultado.keyword, resultado.carta).then(r => {
+          if (r.ok) {
+            addChatMsg('ia', `${resultado.keyword.toUpperCase()} de ${r.carta.name} ativado — bônus aplicado.`);
+          } else {
+            addChatMsg('ia', r.msg || `Não foi possível ativar ${resultado.keyword} em "${resultado.carta}".`);
+          }
+        });
         break;
       }
       case 'ativar_planta': {

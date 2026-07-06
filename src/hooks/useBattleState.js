@@ -1776,6 +1776,37 @@ export function useBattleState(npc) {
     setSapoCururuPendente(null);
   }, []);
 
+  // Força ativação de keyword numa carta em campo — fallback caso injetarKeywordsNosBlocks
+  // não detectou o keyword nos dados da API (e.g. slug com acento diferente do esperado).
+  // Busca dados frescos da API, normaliza e injeta bloco sintético se necessário.
+  const jogadorAtivarKeyword = useCallback(async (keyword, nomeCarta) => {
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#d4a857') => setLog(prev => [...prev, { t: ts(), text, color }]);
+
+    const cardOnField = campoJogador.personagens.find(c =>
+      c && (normStr(c.name) === normStr(nomeCarta) || simBigramas(c.name || '', nomeCarta) >= 0.4)
+    );
+    if (!cardOnField) return { ok: false, msg: `"${nomeCarta}" não está no campo.` };
+
+    const { carta: raw } = await buscarCartaFuzzy(nomeCarta);
+    const fresco = raw ? normalizeCardForSlot(raw) : null;
+
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => {
+        if (!c || normStr(c.name) !== normStr(cardOnField.name)) return c;
+        let blocks = fresco?.effect_blocks ?? c.effect_blocks ?? [];
+        if (!temKeyword({ effect_blocks: blocks }, keyword)) {
+          blocks = [...blocks, { trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: keyword }] }] }];
+        }
+        return { ...c, effect_blocks: blocks };
+      }),
+    }));
+
+    addLog(`[KEYWORD] ${keyword.toUpperCase()} ativado manualmente em ${cardOnField.name}.`);
+    return { ok: true, carta: cardOnField };
+  }, [campoJogador.personagens]);
+
   // Aplica/remove bônus FURIA permanentemente no atk da carta sempre que o campo muda.
   // Usa furiaBonus na carta para não acumular bônus a cada re-render.
   useEffect(() => {
@@ -1813,6 +1844,7 @@ export function useBattleState(npc) {
     npcJogarCarta, jogadorJogarCarta, jogadorJogarPlantaVirada, jogadorRevelarPlanta, jogadorEquiparCarta,
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
+    jogadorAtivarKeyword,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,
     iniciarJogo,

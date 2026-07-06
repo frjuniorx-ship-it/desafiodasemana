@@ -215,6 +215,14 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     if (mFolcGen) return { acao: 'iniciar_folclorica', carta: limpar(mFolcGen[1]) };
   }
 
+  // ATIVAR KEYWORD EXPLÍCITO — "ativo a FURIA da onça pintada", "forço ATRAVESSAR de Tibiriçá"
+  // Deve vir ANTES de mPlanta (que também captura "ativo")
+  const mAtivarKw = t.match(/(?:ativ(?:o|ei)|forc(?:o|ei)|aplic(?:o|ei))\s+(?:a\s+|o\s+|o\s+efeito\s+de\s+)?(furi[ao]|atravessar|veneno\s*mortal|ignorar|atrair|investir|intimidar|arruinar|imunizar|proteger|resistencia|regenerar|frenesi)\s+(?:d[aeo]s?|n[ao]s?|em)\s+(.+)/);
+  if (mAtivarKw) {
+    const normKw = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
+    return { acao: 'ativar_keyword', keyword: normKw(mAtivarKw[1]), carta: limpar(mAtivarKw[2]) };
+  }
+
   // ATIVAR PLANTA — antes de JOGAR CARTA (ambos usam "uso/ativo")
   const mPlanta = t.match(/(?:ativ(?:o|ei)|vir(?:o|ei))\s+(?:a\s+planta\s+)?(.+)/);
   if (mPlanta) {
