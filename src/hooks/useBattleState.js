@@ -203,13 +203,19 @@ function getActionTypes(carta) {
     .filter(t => t && t !== 'none');
 }
 
-function categoriaParaZona(categoria) {
+function categoriaParaZona(carta) {
+  const categoria = typeof carta === 'string' ? carta : (carta?.category ?? carta?.categoria ?? '');
   if (!categoria) return 'personagens';
   const c = categoria.toLowerCase();
   if (c === 'planta') return 'plantas';
   if (c.startsWith('folcl')) return 'folcloricas';
   if (c === 'ação' || c === 'acao') return 'acao';
-  return 'personagens'; // Histórica, Apoio, Fera, Personagem
+  if (c === 'apoio' && typeof carta === 'object') {
+    const mec = carta.mecanica ?? [];
+    if (mec.includes('acao_instantanea') || mec.includes('acao_continua') || mec.includes('acao_turno')) return 'acao';
+    // 'personagem' e 'equipamento' ficam em 'personagens' (equipamento é interceptado antes pelo isEquipamento check)
+  }
+  return 'personagens';
 }
 
 const campoPadrao = () => ({
@@ -1509,14 +1515,13 @@ export function useBattleState(npc) {
       return { carta: null, sugestao };
     }
     const normalizada = { ...normalizeCardForSlot(raw), entrou_turno_atual: true };
-    const zona = categoriaParaZona(normalizada.category);
+    const zona = categoriaParaZona(normalizada);
 
     // Verificar limite de turno antes de colocar (regra 20.0)
-    const cat = (normalizada.category ?? '').toLowerCase();
-    const tipo = cat.startsWith('folcl') ? 'folclorica'
-      : cat === 'planta' ? 'planta'
-      : (cat === 'ação' || cat === 'acao') ? 'acao'
-      : (cat === 'apoio' || cat === 'equipamento') ? 'equipamento'
+    const tipo = isFolclorica(normalizada) ? 'folclorica'
+      : isPlanta(normalizada) ? 'planta'
+      : (isAcaoRapida(normalizada) || isAcaoContinua(normalizada)) ? 'acao'
+      : isEquipamento(normalizada) ? 'equipamento'
       : 'personagem';
     const atual = narracaoJogador.cartasJogadasNesteTurno[tipo] || 0;
     const limite = LIMITE_TURNO[tipo] ?? 1;
