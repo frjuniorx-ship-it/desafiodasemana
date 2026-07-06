@@ -28,6 +28,7 @@ export default function Battle({ npc, onGameOver, token }) {
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
     jogadorAtivarKeyword,
+    jogadorAtivarEfeitoCarta,
     folcloricaPendente,
     narracaoJogador, setNarracaoJogador,
     deckJogadorVazio, setDeckJogadorVazio,
@@ -324,6 +325,12 @@ export default function Battle({ npc, onGameOver, token }) {
         if (!validarLimiteTurno('planta')) break;
         const r = jogadorJogarPlantaVirada();
         setChat(prev => [...prev, { kind: 'system', text: r.ok ? 'Planta colocada em campo (virada).' : r.msg }]);
+        break;
+      }
+      case 'ativar_efeito_carta': {
+        jogadorAtivarEfeitoCarta(resultado.carta).then(r => {
+          addChatMsg('ia', r.ok ? r.msg : (r.msg || `Não foi possível ativar efeito de "${resultado.carta}".`));
+        });
         break;
       }
       case 'ativar_keyword': {

@@ -135,6 +135,7 @@ function normalizeCardForSlot(entrada) {
     entrou_turno_atual: false,
     equipamentos: [],
     efeitosAtivos: [],
+    efeitosAplicados: [],
     atacouNesteTurno: false,
   };
 }
@@ -1807,6 +1808,118 @@ export function useBattleState(npc) {
     return { ok: true, carta: cardOnField };
   }, [campoJogador.personagens]);
 
+  // Ativa o próximo efeito não-aplicado de uma carta em campo.
+  // Rastreia efeitos usados em c.efeitosAplicados[] para não repetir.
+  const jogadorAtivarEfeitoCarta = useCallback(async (nomeCarta) => {
+    const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const addLog = (text, color = '#c89b3c') => setLog(prev => [...prev, { t: ts(), text, color }]);
+
+    const cardOnField = campoJogador.personagens.find(c =>
+      c && (normStr(c.name) === normStr(nomeCarta) || simBigramas(c.name || '', nomeCarta) >= 0.4)
+    );
+    if (!cardOnField) return { ok: false, msg: `"${nomeCarta}" não está no seu campo.` };
+
+    const { carta: raw } = await buscarCartaFuzzy(nomeCarta);
+    const blocks = raw ? normalizeCardForSlot(raw).effect_blocks : (cardOnField.effect_blocks ?? []);
+
+    const jaAplicados = new Set(cardOnField.efeitosAplicados ?? []);
+
+    // Keywords presentes na carta fresca mas ausentes na carta em campo → injetar
+    const kwdsPendentes = Object.values(KEYWORDS).filter(kw =>
+      temKeyword({ effect_blocks: blocks }, kw) && !temKeyword(cardOnField, kw)
+    );
+
+    // Primeiro bloco de ação não-keyword ainda não aplicado
+    let chosen = null;
+    for (const bloco of blocks) {
+      const actions = (bloco.actions || []).filter(a => a.type && a.type !== 'none' && a.type !== 'keyword');
+      if (actions.length === 0) continue;
+      const key = `${bloco.trigger}:${actions.map(a => a.type).join(',')}`;
+      if (jaAplicados.has(key)) continue;
+      chosen = { bloco, actions, key };
+      break;
+    }
+
+    if (!chosen && kwdsPendentes.length === 0) {
+      const efText = cardOnField.effect || cardOnField.magia || cardOnField.combo_habilidade || '';
+      return { ok: false, msg: `${cardOnField.name} não tem efeitos ativos para ativar${efText ? ` — "${efText}"` : ''}.` };
+    }
+
+    let resultMsg = cardOnField.name;
+    const cardName = cardOnField.name;
+
+    // Resolve valores do bloco escolhido antes dos setters
+    let atkBuf = 0, defBuf = 0, pcBuf = 0, tipos = [], chosenKey = null;
+    let targetSelf = false, targetOpponent = false;
+    if (chosen) {
+      chosen.actions.forEach(a => { atkBuf += a.value_attack || 0; defBuf += a.value_defense || 0; pcBuf += a.value_pc || 0; });
+      tipos = chosen.actions.map(a => a.type);
+      chosenKey = chosen.key;
+      const isStatMod = tipos.some(t => ['modify_attack', 'modify_defense', 'modify_stats'].includes(t));
+      targetSelf = chosen.bloco.target_scope === 'self' || (!chosen.bloco.target_scope && isStatMod && atkBuf >= 0 && defBuf >= 0);
+      targetOpponent = chosen.bloco.target_scope === 'opponent' || (!chosen.bloco.target_scope && isStatMod && (atkBuf < 0 || defBuf < 0));
+    }
+
+    // Aplica tudo num único setCampoJogador para evitar conflito de batch
+    setCampoJogador(prev => ({
+      ...prev,
+      personagens: prev.personagens.map(c => {
+        if (!c || normStr(c.name) !== normStr(cardName)) return c;
+        let updated = { ...c };
+        // Injetar keywords pendentes
+        if (kwdsPendentes.length > 0) {
+          const kwBlocks = kwdsPendentes.map(kw => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: kw }] }] }));
+          updated.effect_blocks = [...(updated.effect_blocks ?? []), ...kwBlocks];
+        }
+        // Self stat buff
+        if (chosen && targetSelf) {
+          updated.atk = (updated.atk ?? 0) + atkBuf;
+          updated.def = (updated.def ?? 0) + defBuf;
+        }
+        // Mark effect as applied
+        if (chosenKey) updated.efeitosAplicados = [...(updated.efeitosAplicados ?? []), chosenKey];
+        return updated;
+      }),
+    }));
+
+    if (chosen && targetOpponent) {
+      setCampoNpc(prev => ({
+        ...prev,
+        personagens: prev.personagens.map(c => c
+          ? { ...c, atk: Math.max(0, (c.atk ?? 0) + atkBuf), def: Math.max(0, (c.def ?? 0) + defBuf) }
+          : null),
+      }));
+    }
+
+    if (chosen && tipos.includes('gain_pc')) {
+      const gain = Math.abs(pcBuf) || 2;
+      setPcJogador(p => p + gain);
+      resultMsg = `${cardName}: você ganhou ${gain} PC`;
+      addLog(`[EFEITO] ${cardName}: você recuperou ${gain} PC.`);
+    } else if (chosen && tipos.includes('lose_pc')) {
+      const lose = Math.abs(pcBuf) || 2;
+      setPcNpc(p => Math.max(0, p - lose));
+      resultMsg = `${cardName}: NPC perdeu ${lose} PC`;
+      addLog(`[EFEITO] ${cardName}: NPC perdeu ${lose} PC.`);
+    } else if (chosen && targetSelf && (atkBuf || defBuf)) {
+      resultMsg = `${cardName}: +${atkBuf} ATQ / +${defBuf} DEF`;
+      addLog(`[EFEITO] ${cardName}: +${atkBuf} ATQ / +${defBuf} DEF aplicados.`);
+    } else if (chosen && targetOpponent && (atkBuf || defBuf)) {
+      resultMsg = `${cardName}: ${atkBuf} ATQ / ${defBuf} DEF no campo do NPC`;
+      addLog(`[EFEITO] ${cardName}: ${atkBuf} ATQ / ${defBuf} DEF aplicados ao NPC.`);
+    } else if (kwdsPendentes.length > 0) {
+      resultMsg = `${cardName}: keywords ${kwdsPendentes.join(', ')} ativadas`;
+      addLog(`[EFEITO] ${cardName}: ${kwdsPendentes.map(k => k.toUpperCase()).join(', ')} ativados.`);
+    } else if (chosen) {
+      // Efeito desconhecido: exibe o texto e marca como visto
+      const efText = cardOnField.effect || cardOnField.magia || cardOnField.combo_habilidade || tipos.join(', ');
+      resultMsg = `${cardName}: ${efText} (confirme se aplicou manualmente)`;
+      addLog(`[EFEITO] ${cardName}: ${efText}.`);
+    }
+
+    return { ok: true, msg: resultMsg };
+  }, [campoJogador.personagens]);
+
   // Aplica/remove bônus FURIA permanentemente no atk da carta sempre que o campo muda.
   // Usa furiaBonus na carta para não acumular bônus a cada re-render.
   useEffect(() => {
@@ -1845,6 +1958,7 @@ export function useBattleState(npc) {
     jogadorAtacar, jogadorAtaqueDireto, confirmarCombate, aplicarResultadoCombate,
     jogadorIniciarFolclorica, jogadorCompletarFolclorica, executarEfeitoFolclorica, jogadorExecutarEfeitoPlanta, ativarPlantaContraAtaque, resolverCombateCompleto,
     jogadorAtivarKeyword,
+    jogadorAtivarEfeitoCarta,
     passarVez: npcExecutarTurno,
     esquecimentoJogador,
     iniciarJogo,

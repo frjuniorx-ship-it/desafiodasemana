@@ -215,6 +215,13 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     if (mFolcGen) return { acao: 'iniciar_folclorica', carta: limpar(mFolcGen[1]) };
   }
 
+  // ATIVAR EFEITO GERAL — "ativo efeito da carta X", "uso efeito do escorpião amarelo"
+  // Deve vir ANTES de mAtivarKw e mPlanta para capturar a palavra "efeito" explícita
+  const mAtivarEfeito = t.match(/(?:ativ(?:o|ei)|us(?:o|ei))\s+(?:o\s+|os\s+)?efeito(?:s)?\s+d[aeo]s?\s+(?:carta\s+)?(.+)/);
+  if (mAtivarEfeito) {
+    return { acao: 'ativar_efeito_carta', carta: limpar(mAtivarEfeito[1]) };
+  }
+
   // ATIVAR KEYWORD EXPLÍCITO — "ativo a FURIA da onça pintada", "forço ATRAVESSAR de Tibiriçá"
   // Deve vir ANTES de mPlanta (que também captura "ativo")
   const mAtivarKw = t.match(/(?:ativ(?:o|ei)|forc(?:o|ei)|aplic(?:o|ei))\s+(?:a\s+|o\s+|o\s+efeito\s+de\s+)?(furi[ao]|atravessar|veneno\s*mortal|ignorar|atrair|investir|intimidar|arruinar|imunizar|proteger|resistencia|regenerar|frenesi)\s+(?:d[aeo]s?|n[ao]s?|em)\s+(.+)/);
