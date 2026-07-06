@@ -522,7 +522,6 @@ export default function Battle({ npc, onGameOver, token }) {
     setChat(prev => [...prev, { kind: 'ia', text: msg }]);
   }, [sapoCururuPendente]);
 
-  console.log('[MODO SELECAO]', modoSelecao);
   return (
     <main style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '8px 14px 0', boxSizing: 'border-box' }}>
       <div className="battle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 14, flex: 1, minHeight: 0, overflow: 'hidden' }}>

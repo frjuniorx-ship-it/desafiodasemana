@@ -156,8 +156,8 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'atacar', alvo: limpar(mAtacarInverso[2]), carta: limpar(mAtacarInverso[1]) };
   }
 
-  // "ataco" ou "atacar" sozinho → modo seleção de atacante por clique
-  if (/^(?:atac[oa]|atacar)$/.test(t)) {
+  // "ataco", "atacar", "ataque" sozinho → modo seleção de atacante por clique
+  if (/^(?:atac[oa]|atacar|ataque)$/.test(t)) {
     return { acao: 'selecionar_atacante' };
   }
 
