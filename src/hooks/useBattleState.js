@@ -1543,7 +1543,14 @@ export function useBattleState(npc) {
         const idx = next.personagens.indexOf(null);
         if (idx === -1) return prev;
         next.personagens = [...next.personagens];
-        next.personagens[idx] = normalizada;
+        // Aplica FURIA diretamente ao entrar em campo, sem depender do useEffect
+        let cartaParaCampo = normalizada;
+        if (temKeyword(normalizada, KEYWORDS.FURIA)) {
+          const totalAposEntrada = next.personagens.filter(Boolean).length + 1;
+          const novoBonus = calcularFuria(normalizada, totalAposEntrada);
+          cartaParaCampo = { ...normalizada, atk: (normalizada.atk ?? 0) + novoBonus, furiaBonus: novoBonus };
+        }
+        next.personagens[idx] = cartaParaCampo;
       } else if (zona === 'plantas') {
         const idx = next.plantas.indexOf(null);
         if (idx === -1) return prev;
@@ -1787,7 +1794,10 @@ export function useBattleState(npc) {
     const cardOnField = campoJogador.personagens.find(c =>
       c && (normStr(c.name) === normStr(nomeCarta) || simBigramas(c.name || '', nomeCarta) >= 0.4)
     );
-    if (!cardOnField) return { ok: false, msg: `"${nomeCarta}" não está no campo.` };
+    if (!cardOnField) {
+      addLog(`[KEYWORD] "${nomeCarta}" não encontrada no campo.`, '#c84d2a');
+      return { ok: false, msg: `"${nomeCarta}" não está no campo.` };
+    }
 
     const { carta: raw } = await buscarCartaFuzzy(nomeCarta);
     const fresco = raw ? normalizeCardForSlot(raw) : null;
@@ -1800,11 +1810,19 @@ export function useBattleState(npc) {
         if (!temKeyword({ effect_blocks: blocks }, keyword)) {
           blocks = [...blocks, { trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: keyword }] }] }];
         }
-        return { ...c, effect_blocks: blocks };
+        const updated = { ...c, effect_blocks: blocks };
+        // Aplica bônus de FURIA diretamente — não depende do useEffect para a ativação manual.
+        if (keyword === KEYWORDS.FURIA) {
+          const total = prev.personagens.filter(Boolean).length;
+          const base = (c.atk ?? 0) - (c.furiaBonus ?? 0);
+          const novoBonus = calcularFuria({ effect_blocks: blocks }, total);
+          return { ...updated, atk: base + novoBonus, furiaBonus: novoBonus };
+        }
+        return updated;
       }),
     }));
 
-    addLog(`[KEYWORD] ${keyword.toUpperCase()} ativado manualmente em ${cardOnField.name}.`);
+    addLog(`[KEYWORD] ${keyword.toUpperCase()} ativado em ${cardOnField.name}.`);
     return { ok: true, carta: cardOnField };
   }, [campoJogador.personagens]);
 
@@ -1866,10 +1884,18 @@ export function useBattleState(npc) {
       personagens: prev.personagens.map(c => {
         if (!c || normStr(c.name) !== normStr(cardName)) return c;
         let updated = { ...c };
-        // Injetar keywords pendentes
+        // Injetar keywords pendentes nos effect_blocks
         if (kwdsPendentes.length > 0) {
           const kwBlocks = kwdsPendentes.map(kw => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: kw }] }] }));
           updated.effect_blocks = [...(updated.effect_blocks ?? []), ...kwBlocks];
+        }
+        // Aplicar bônus FURIA diretamente se foi uma das keywords injetadas
+        if (kwdsPendentes.includes(KEYWORDS.FURIA)) {
+          const total = prev.personagens.filter(Boolean).length;
+          const base = (c.atk ?? 0) - (c.furiaBonus ?? 0);
+          const novoBonus = calcularFuria({ effect_blocks: updated.effect_blocks }, total);
+          updated.atk = base + novoBonus;
+          updated.furiaBonus = novoBonus;
         }
         // Self stat buff
         if (chosen && targetSelf) {
