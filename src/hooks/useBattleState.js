@@ -77,13 +77,17 @@ function injetarKeywordsNosBlocks(entrada) {
   const normalizedBlocks = rawBlocks.map(bloco => ({
     ...bloco,
     actions: (bloco.actions || []).map(action => {
+      // Normaliza effect_reference — também extrai e.behavior_slug caso e.slug esteja ausente
       const normalizedRefs = (action.effect_reference || []).map(e => ({
         ...e,
-        slug: normSlug(e.slug || ''),
+        slug: normSlug(e.slug || e.behavior_slug || ''),
       }));
+      // Verifica action.type E action.behavior_slug (API usa qualquer um dos dois)
       const slug = normSlug(action.type || '');
-      if (kwdSet.has(slug) && !normalizedRefs.some(e => e.slug === slug)) {
-        return { ...action, effect_reference: [...normalizedRefs, { slug }] };
+      const slugBehavior = normSlug(action.behavior_slug || '');
+      const candidateSlug = kwdSet.has(slug) ? slug : kwdSet.has(slugBehavior) ? slugBehavior : null;
+      if (candidateSlug && !normalizedRefs.some(e => e.slug === candidateSlug)) {
+        return { ...action, effect_reference: [...normalizedRefs, { slug: candidateSlug }] };
       }
       return { ...action, effect_reference: normalizedRefs };
     }),
@@ -93,9 +97,12 @@ function injetarKeywordsNosBlocks(entrada) {
   const jaPresentes = new Set(
     normalizedBlocks.flatMap(b => (b.actions || []).flatMap(a => (a.effect_reference || []).map(e => e.slug)))
   );
-  // API pode enviar mecanica como string "INVESTIR·FURIA" ou "INVESTIR, FURIA" — dividir antes de checar
+  // API pode enviar mecanica como string "INVESTIR·FURIA", array de strings, ou array de objetos {slug, name}
   const mecKwds = toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
-    .flatMap(m => String(m || '').split(/[,;·\s]+/).map(s => normSlug(s.trim())))
+    .flatMap(m => {
+      const str = typeof m === 'string' ? m : (m?.slug || m?.name || m?.display_name || '');
+      return str.split(/[,;·\s]+/).map(s => normSlug(s.trim()));
+    })
     .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug));
 
   if (mecKwds.length === 0) return normalizedBlocks;
@@ -1951,18 +1958,6 @@ export function useBattleState(npc) {
   useEffect(() => {
     const personagens = campoJogador.personagens;
     const total = personagens.filter(Boolean).length;
-    // Diagnóstico: logar estrutura das cartas para identificar por que temKeyword falha
-    console.log('[FURIA] useEffect acionado, personagens:',
-      personagens.filter(Boolean).map(c => ({
-        nome: c.name ?? c.nome,
-        temFuria: temKeyword(c, KEYWORDS.FURIA),
-        effect_blocks_count: c.effect_blocks?.length ?? 0,
-        effect_blocks_sample: c.effect_blocks?.slice(0, 2),
-        mecanica: c.mecanica,
-        atk: c.atk,
-        furiaBonus: c.furiaBonus,
-      }))
-    );
     const needsUpdate = personagens.some(c => {
       if (!c || !temKeyword(c, KEYWORDS.FURIA)) return false;
       return (c.furiaBonus ?? 0) !== calcularFuria(c, total);
