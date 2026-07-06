@@ -1951,6 +1951,18 @@ export function useBattleState(npc) {
   useEffect(() => {
     const personagens = campoJogador.personagens;
     const total = personagens.filter(Boolean).length;
+    // Diagnóstico: logar estrutura das cartas para identificar por que temKeyword falha
+    console.log('[FURIA] useEffect acionado, personagens:',
+      personagens.filter(Boolean).map(c => ({
+        nome: c.name ?? c.nome,
+        temFuria: temKeyword(c, KEYWORDS.FURIA),
+        effect_blocks_count: c.effect_blocks?.length ?? 0,
+        effect_blocks_sample: c.effect_blocks?.slice(0, 2),
+        mecanica: c.mecanica,
+        atk: c.atk,
+        furiaBonus: c.furiaBonus,
+      }))
+    );
     const needsUpdate = personagens.some(c => {
       if (!c || !temKeyword(c, KEYWORDS.FURIA)) return false;
       return (c.furiaBonus ?? 0) !== calcularFuria(c, total);
