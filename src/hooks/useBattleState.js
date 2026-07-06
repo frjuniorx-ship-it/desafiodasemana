@@ -72,15 +72,20 @@ function injetarKeywordsNosBlocks(entrada) {
   const normSlug = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
   const rawBlocks = toArray(entrada.effect_blocks ?? []);
 
-  // Blocks existentes: se action.type é um keyword slug, garantir effect_reference
+  // Blocks existentes: normalizar slugs de effect_reference E garantir que action.type keyword
+  // tenha effect_reference. Normalizar slugs resolve casos como API enviando 'fúria' vs 'furia'.
   const normalizedBlocks = rawBlocks.map(bloco => ({
     ...bloco,
     actions: (bloco.actions || []).map(action => {
+      const normalizedRefs = (action.effect_reference || []).map(e => ({
+        ...e,
+        slug: normSlug(e.slug || ''),
+      }));
       const slug = normSlug(action.type || '');
-      if (kwdSet.has(slug) && !(action.effect_reference || []).some(e => e.slug === slug)) {
-        return { ...action, effect_reference: [...(action.effect_reference || []), { slug }] };
+      if (kwdSet.has(slug) && !normalizedRefs.some(e => e.slug === slug)) {
+        return { ...action, effect_reference: [...normalizedRefs, { slug }] };
       }
-      return action;
+      return { ...action, effect_reference: normalizedRefs };
     }),
   }));
 
