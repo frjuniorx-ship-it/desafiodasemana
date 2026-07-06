@@ -72,12 +72,19 @@ function injetarKeywordsNosBlocks(entrada) {
   const normSlug = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
   const rawBlocks = toArray(entrada.effect_blocks ?? []);
 
-  // Diagnóstico: exibe shape real dos dados para cartas com mecanica (remover após confirmar)
+  // Diagnóstico: dump completo para Onça-Pintada (remover após confirmar)
   const nomeCarta = entrada.nome ?? entrada.name ?? '';
-  if ((entrada.mecanica?.length || entrada.mecanicas?.length) && rawBlocks.length > 0) {
-    console.log('[INJECT] carta:', nomeCarta,
-      '| mecanica[0]:', JSON.stringify(entrada.mecanica?.[0] ?? entrada.mecanicas?.[0]),
-      '| block[0].actions[0]:', JSON.stringify(rawBlocks[0]?.actions?.[0])
+  if (/on.a.pintada/i.test(nomeCarta)) {
+    console.log('[INJECT-FULL] Onça-Pintada raw:',
+      JSON.stringify({
+        mecanica: entrada.mecanica,
+        mecanicas: entrada.mecanicas,
+        instinto: entrada.instinto,
+        habilidade: entrada.habilidade,
+        efeito: entrada.efeito,
+        effect_blocks_count: rawBlocks.length,
+        all_blocks: rawBlocks.map(b => ({ trigger: b.trigger, actions: b.actions })),
+      })
     );
   }
 
