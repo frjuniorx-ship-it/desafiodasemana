@@ -72,33 +72,15 @@ function injetarKeywordsNosBlocks(entrada) {
   const normSlug = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '_').trim();
   const rawBlocks = toArray(entrada.effect_blocks ?? []);
 
-  // Diagnóstico: dump completo para Onça-Pintada (remover após confirmar)
-  const nomeCarta = entrada.nome ?? entrada.name ?? '';
-  if (/on.a.pintada/i.test(nomeCarta)) {
-    console.log('[INJECT-FULL] Onça-Pintada raw:',
-      JSON.stringify({
-        mecanica: entrada.mecanica,
-        mecanicas: entrada.mecanicas,
-        instinto: entrada.instinto,
-        habilidade: entrada.habilidade,
-        efeito: entrada.efeito,
-        effect_blocks_count: rawBlocks.length,
-        all_blocks: rawBlocks.map(b => ({ trigger: b.trigger, actions: b.actions })),
-      })
-    );
-  }
-
-  // Blocks existentes: normalizar slugs de effect_reference E garantir que action.type keyword
-  // tenha effect_reference. Normalizar slugs resolve casos como API enviando 'fúria' vs 'furia'.
+  // A API envia actions como array de arrays: [[action1, action2]] em vez de [action1, action2].
+  // .flat() corrige isso antes de processar cada action individualmente.
   const normalizedBlocks = rawBlocks.map(bloco => ({
     ...bloco,
-    actions: (bloco.actions || []).map(action => {
-      // Normaliza effect_reference — também extrai e.behavior_slug caso e.slug esteja ausente
+    actions: (bloco.actions || []).flat().map(action => {
       const normalizedRefs = (action.effect_reference || []).map(e => ({
         ...e,
         slug: normSlug(e.slug || e.behavior_slug || ''),
       }));
-      // Verifica action.type E action.behavior_slug (API usa qualquer um dos dois)
       const slug = normSlug(action.type || '');
       const slugBehavior = normSlug(action.behavior_slug || '');
       const candidateSlug = kwdSet.has(slug) ? slug : kwdSet.has(slugBehavior) ? slugBehavior : null;
@@ -109,22 +91,35 @@ function injetarKeywordsNosBlocks(entrada) {
     }),
   }));
 
-  // Keywords em mecanica[] não presentes nos blocks → block sintético passivo
   const jaPresentes = new Set(
     normalizedBlocks.flatMap(b => (b.actions || []).flatMap(a => (a.effect_reference || []).map(e => e.slug)))
   );
-  // API pode enviar mecanica como string "INVESTIR·FURIA", array de strings, ou array de objetos {slug, name}
+
+  // Extrai keywords de mecanica[] (string, objeto {slug/name}, ou array combinado)
   const mecKwds = toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
     .flatMap(m => {
       const str = typeof m === 'string' ? m : (m?.slug || m?.name || m?.display_name || '');
-      return str.split(/[,;·\s]+/).map(s => normSlug(s.trim()));
+      return str.split(/[,;·\s/]+/).map(s => normSlug(s.trim()));
     })
     .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug));
 
-  if (mecKwds.length === 0) return normalizedBlocks;
+  // Extrai keywords de campos de texto (instinto, efeito, habilidade…)
+  // A Onça-Pintada tem FURIA apenas em instinto:"INVESTIR / FÚRIA"
+  const efeitoStr = Array.isArray(entrada.efeito)
+    ? entrada.efeito.map(e => e?.display_name || e?.name || (typeof e === 'string' ? e : '')).join(' ')
+    : (entrada.efeito ?? '');
+  const textoKwds = [entrada.instinto, entrada.habilidade, efeitoStr, entrada.encantamento]
+    .filter(Boolean)
+    .join(' ')
+    .split(/[,;·\s/]+/)
+    .map(s => normSlug(s.trim()))
+    .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug) && !mecKwds.includes(slug));
+
+  const todosNovos = [...new Set([...mecKwds, ...textoKwds])];
+  if (todosNovos.length === 0) return normalizedBlocks;
   return [
     ...normalizedBlocks,
-    ...mecKwds.map(slug => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug }] }] })),
+    ...todosNovos.map(slug => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug }] }] })),
   ];
 }
 
