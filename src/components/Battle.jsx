@@ -201,6 +201,9 @@ export default function Battle({ npc, onGameOver, token }) {
           }
           const texto = equipadoEm ? `${carta.name} equipado em ${equipadoEm}.` : `${carta.name} jogado em campo.`;
           setChat(prev => [...prev, { kind: 'system', text: texto }]);
+          if (!equipadoEm && temKeyword(carta, KEYWORDS.REMOCAO_ENCANTAMENTO)) {
+            jogadorExecutarEfeitoPlanta(carta, false, null);
+          }
         });
         break;
       }
@@ -328,12 +331,29 @@ export default function Battle({ npc, onGameOver, token }) {
         break;
       }
       case 'ativar_efeito_carta': {
+        const cardNoField = buscarNoCampo(campoJogador.personagens, resultado.carta);
+        if (cardNoField && temKeyword(cardNoField, KEYWORDS.REMOCAO_ENCANTAMENTO)) {
+          jogadorExecutarEfeitoPlanta(cardNoField, false, null);
+          addChatMsg('system', `${cardNoField.name}: Remoção de Encantamento ativada.`);
+          break;
+        }
         jogadorAtivarEfeitoCarta(resultado.carta).then(r => {
           addChatMsg('ia', r.ok ? r.msg : (r.msg || `Não foi possível ativar efeito de "${resultado.carta}".`));
         });
         break;
       }
       case 'ativar_keyword': {
+        if (resultado.keyword === KEYWORDS.REMOCAO_ENCANTAMENTO || resultado.keyword === KEYWORDS.REMOCAO_MAGIA) {
+          const kw = resultado.keyword;
+          const cardComKw = campoJogador.personagens.find(c => c && temKeyword(c, kw));
+          if (cardComKw) {
+            jogadorExecutarEfeitoPlanta(cardComKw, false, null);
+            addChatMsg('system', `${cardComKw.name}: ${resultado.keyword === KEYWORDS.REMOCAO_ENCANTAMENTO ? 'Remoção de Encantamento' : 'Remoção de Magia'} ativada.`);
+          } else {
+            addChatMsg('ia', `Nenhum personagem em campo com ${resultado.keyword.replace(/_/g, ' ')}.`);
+          }
+          break;
+        }
         jogadorAtivarKeyword(resultado.keyword, resultado.carta).then(r => {
           if (r.ok) {
             addChatMsg('ia', `${resultado.keyword.toUpperCase()} de ${r.carta.name} ativado — bônus aplicado.`);

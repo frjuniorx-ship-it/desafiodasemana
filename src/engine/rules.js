@@ -112,10 +112,10 @@ export function isContraAtaque(carta) {
 // Exceção: INVESTIR permite atacar no turno de entrada
 export function podeAtacar(carta) {
   if (!carta.entrou_turno_atual) return true;
-  return temKeyword(carta, 'investir');
+  return temKeyword(carta, KEYWORDS.INVESTIR);
 }
 
-// KEYWORDS PASSIVAS — slugs oficiais da API (LB_Ref v30 §7.2)
+// KEYWORDS PASSIVAS — behavior_slug reais da API (confirmados via console, LB_Ref v30 §7.2)
 export const KEYWORDS = {
   ATRAVESSAR: 'atravessar',
   VENENO_MORTAL: 'veneno_mortal',
@@ -124,24 +124,40 @@ export const KEYWORDS = {
   INVESTIR: 'investir',
   FURIA: 'furia',
   INTIMIDAR: 'intimidar',
-  ARRUINAR: 'arruinar',
+  ARRUINAR: 'arruinar_snapshot',
   IMUNIZAR: 'imunizar',
   PROTEGER: 'proteger',
   RESISTENCIA: 'resistencia',
   REGENERAR: 'regenerar',
   FRENESI: 'frenesi',
-  ABSORVER_CONHECIMENTO: 'absorver_conhecimento',
-  REMOCAO_ENCANTAMENTO: 'remocao_de_encantamento',
-  REMOCAO_MAGIA: 'remocao_de_magia',
   IMOBILIZAR: 'imobilizar',
+  ABSORVER_CONHECIMENTO: 'absorver_conhecimento',
+  REMOCAO_ENCANTAMENTO: 'remocao_encantamento',
+  REMOCAO_MAGIA: 'remocao_magia',
+  INVULNERAVEL_PRIMEIRO_ATAQUE: 'invulneravel_ao_primeiro_ataque',
+  IMUNE_MAGIAS: 'imune_a_magias',
+  ATAQUE_DIRETO_PC: 'ataque_direto_ao_pc',
 };
 
 export function temKeyword(carta, keyword) {
-  return carta.effect_blocks?.some(b =>
-    b.actions?.some(a =>
-      a.effect_reference?.some(e => e.slug === keyword)
+  if (!carta?.effect_blocks?.length) return false;
+  return carta.effect_blocks.some(bloco =>
+    bloco.actions?.some(action =>
+      action.effect_reference?.some(ref =>
+        ref.behavior_slug === keyword
+      )
     )
-  ) || false;
+  );
+}
+
+export function getKeywords(carta) {
+  if (!carta?.effect_blocks?.length) return [];
+  const slugs = carta.effect_blocks.flatMap(b =>
+    b.actions?.flatMap(a =>
+      a.effect_reference?.map(r => r.behavior_slug).filter(Boolean) || []
+    ) || []
+  );
+  return [...new Set(slugs)];
 }
 
 // FÚRIA — cálculo do bônus (regra FÚRIA + clarificação oficial)
@@ -149,7 +165,7 @@ export function temKeyword(carta, keyword) {
 export function calcularFuria(carta, totalPersonagensEmCampo) {
   if (!temKeyword(carta, KEYWORDS.FURIA)) return 0;
   const acompanhantes = totalPersonagensEmCampo - 1;
-  if (acompanhantes === 0) return 2;
+  if (acompanhantes <= 0) return 2;
   if (acompanhantes === 1) return 1;
   return 0;
 }

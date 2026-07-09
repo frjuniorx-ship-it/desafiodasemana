@@ -230,6 +230,13 @@ export function processarAcaoBatalha(texto, estadoCampo) {
     return { acao: 'ativar_keyword', keyword: normKw(mAtivarKw[1]), carta: limpar(mAtivarKw[2]) };
   }
 
+  // ATIVAR REMOÇÃO DE ENCANTAMENTO/MAGIA — antes do catch-all de plantas
+  const mRemocaoKw = t.match(/(?:ativ(?:o|ei)|us(?:o|ei)|forc(?:o|ei))\s+remo[cç][aã]o\s+(?:de\s+)?(encantamento|magia)/);
+  if (mRemocaoKw) {
+    const kw = mRemocaoKw[1].startsWith('encant') ? 'remocao_encantamento' : 'remocao_magia';
+    return { acao: 'ativar_keyword', keyword: kw };
+  }
+
   // ATIVAR PLANTA — antes de JOGAR CARTA (ambos usam "uso/ativo")
   const mPlanta = t.match(/(?:ativ(?:o|ei)|vir(?:o|ei))\s+(?:a\s+planta\s+)?(.+)/);
   if (mPlanta) {

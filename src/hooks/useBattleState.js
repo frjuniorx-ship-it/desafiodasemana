@@ -3,7 +3,7 @@ import { getDesafioById } from '../api/desafios.js';
 import { getCartas } from '../api/cartas.js';
 import {
   isPersonagem, isEquipamento, isAcaoRapida, isAcaoContinua,
-  isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea, isEspera,
+  isFolclorica, isPlanta, podeAtacar, podeEquipar, isInstantanea, isEspera, isContraAtaque,
   podeSer_Jogada_Folclorica, resolverCombate, pcPerdidoPorDestruicao,
   podeSerDescartada, calcularFuria, temKeyword, KEYWORDS,
   SLOTS, LIMITE_TURNO, PC_INICIAL, COMPRA_POR_TURNO, COMPRA_MAO_VAZIA,
@@ -85,7 +85,7 @@ function injetarKeywordsNosBlocks(entrada) {
       const slugBehavior = normSlug(action.behavior_slug || '');
       const candidateSlug = kwdSet.has(slug) ? slug : kwdSet.has(slugBehavior) ? slugBehavior : null;
       if (candidateSlug && !normalizedRefs.some(e => e.slug === candidateSlug)) {
-        return { ...action, effect_reference: [...normalizedRefs, { slug: candidateSlug }] };
+        return { ...action, effect_reference: [...normalizedRefs, { slug: candidateSlug, behavior_slug: candidateSlug }] };
       }
       return { ...action, effect_reference: normalizedRefs };
     }),
@@ -96,9 +96,13 @@ function injetarKeywordsNosBlocks(entrada) {
   );
 
   // Extrai keywords de mecanica[] (string, objeto {slug/name}, ou array combinado)
+  // Tenta o valor inteiro primeiro (ex: "remoção de encantamento" → "remocao_de_encantamento")
+  // antes de fazer split, para não quebrar keywords multi-palavra.
   const mecKwds = toArray(entrada.mecanica ?? entrada.mecanicas ?? [])
     .flatMap(m => {
       const str = typeof m === 'string' ? m : (m?.slug || m?.name || m?.display_name || '');
+      const wholeNorm = normSlug(str.trim());
+      if (kwdSet.has(wholeNorm)) return [wholeNorm];
       return str.split(/[,;·\s/]+/).map(s => normSlug(s.trim()));
     })
     .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug));
@@ -110,16 +114,18 @@ function injetarKeywordsNosBlocks(entrada) {
     : (entrada.efeito ?? '');
   const textoKwds = [entrada.instinto, entrada.habilidade, efeitoStr, entrada.encantamento]
     .filter(Boolean)
-    .join(' ')
-    .split(/[,;·\s/]+/)
-    .map(s => normSlug(s.trim()))
+    .flatMap(campo => {
+      const wholeNorm = normSlug(campo.trim());
+      if (kwdSet.has(wholeNorm)) return [wholeNorm];
+      return campo.split(/[,;·\s/]+/).map(s => normSlug(s.trim()));
+    })
     .filter(slug => slug.length > 0 && kwdSet.has(slug) && !jaPresentes.has(slug) && !mecKwds.includes(slug));
 
   const todosNovos = [...new Set([...mecKwds, ...textoKwds])];
   if (todosNovos.length === 0) return normalizedBlocks;
   return [
     ...normalizedBlocks,
-    ...todosNovos.map(slug => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug }] }] })),
+    ...todosNovos.map(slug => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug, behavior_slug: slug }] }] })),
   ];
 }
 
@@ -159,6 +165,7 @@ function normalizeCardForSlot(entrada) {
     efeitosAtivos: [],
     efeitosAplicados: [],
     atacouNesteTurno: false,
+    ativacao: entrada.ativacao ?? null,
   };
 }
 
@@ -620,7 +627,7 @@ export function useBattleState(npc) {
     // Executa efeito de planta instantânea do NPC
     const executarEfeitoPlantaNpc = (carta) => {
       const behaviors = getBehaviors(carta);
-      if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
+      if (behaviors.includes('remocao_encantamento')) {
         setCampoJogador(prev => {
           const plantas = [...prev.plantas];
           const idx = plantas.findIndex(Boolean);
@@ -633,7 +640,7 @@ export function useBattleState(npc) {
           addLog(`[PLANTA] ${carta.name}: removeu ${nome && nome !== '???' ? nome : 'uma planta'} do seu campo.`, '#c84d2a');
           return { ...prev, plantas };
         });
-      } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
+      } else if (behaviors.includes('remocao_magia')) {
         setCampoJogador(prev => ({ ...prev, acao: null }));
         addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo adversário.`, '#8ac46a');
       } else if (behaviors.includes('gain_pc')) {
@@ -1208,7 +1215,7 @@ export function useBattleState(npc) {
     const addLog = (text, color = '#e8d5a8') => setLog(prev => [...prev, { t: ts(), text, color }]);
     const behaviors = getActionTypes(carta);
 
-    if (behaviors.includes('remocao_encantamento') || behaviors.includes('remocao_de_encantamento')) {
+    if (behaviors.includes('remocao_encantamento')) {
       setCampoNpc(prev => {
         const plantas = [...prev.plantas];
         const idx = plantas.findIndex(Boolean);
@@ -1221,7 +1228,7 @@ export function useBattleState(npc) {
         addLog(`[PLANTA] ${carta.name}: removeu ${nome && nome !== '???' ? nome : 'uma planta'} do campo do NPC.`, '#8ac46a');
         return { ...prev, plantas };
       });
-    } else if (behaviors.includes('remocao_magia') || behaviors.includes('remocao_de_magia')) {
+    } else if (behaviors.includes('remocao_magia')) {
       setCampoNpc(prev => ({ ...prev, acao: null }));
       addLog(`[PLANTA] ${carta.name}: removeu magia contínua do campo do NPC.`, '#8ac46a');
     } else if (behaviors.includes('gain_pc')) {
@@ -1576,6 +1583,12 @@ export function useBattleState(npc) {
       return { carta: normalizada, sugestao: null, equipadoEm: alvo.name };
     }
 
+    // Plantas de Espera e Contra-Ataque nunca entram direto da mão (regra 35.0)
+    if (zona === 'plantas' && !isInstantanea(normalizada)) {
+      const modos = normalizada.ativacao || 'Espera/Contra-Ataque';
+      return { carta: null, sugestao: null, msg: `${normalizada.name} é uma planta de ativação "${modos}" — coloque-a virada em campo primeiro (diga "coloco uma planta em campo") e revele quando a condição for atendida.` };
+    }
+
     setNarracaoJogador(prev => ({
       ...prev,
       cartasJogadasNesteTurno: { ...prev.cartasJogadasNesteTurno, [tipo]: (prev.cartasJogadasNesteTurno[tipo] || 0) + 1 },
@@ -1625,6 +1638,12 @@ export function useBattleState(npc) {
     const { carta: raw, sugestao } = await buscarCartaFuzzy(nomeCarta);
     if (!raw) return { ok: false, sugestao };
     const normalizada = normalizeCardForSlot(raw);
+
+    // Contra-Ataque só pode ser revelada durante ataque do adversário (regra 35.0)
+    if (isContraAtaque(normalizada) && !combatePendente) {
+      return { ok: false, msg: `${normalizada.name} é uma planta de Contra-Ataque — só pode ser revelada em resposta a um ataque do adversário.` };
+    }
+
     const targetIdx = slotIndex !== undefined ? slotIndex : ocultaIdxs[0];
     setCampoJogador(prev => {
       const plantas = [...prev.plantas];
@@ -1633,7 +1652,7 @@ export function useBattleState(npc) {
       return { ...prev, plantas };
     });
     return { ok: true, carta: normalizada };
-  }, [campoJogador]);
+  }, [campoJogador, combatePendente]);
 
   const jogadorJogarPlantaVirada = useCallback(() => {
     const temSlot = campoJogador.plantas.includes(null);
@@ -1852,7 +1871,7 @@ export function useBattleState(npc) {
         if (!c || normStr(c.name) !== normStr(cardOnField.name)) return c;
         let blocks = fresco?.effect_blocks ?? c.effect_blocks ?? [];
         if (!temKeyword({ effect_blocks: blocks }, keyword)) {
-          blocks = [...blocks, { trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: keyword }] }] }];
+          blocks = [...blocks, { trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: keyword, behavior_slug: keyword }] }] }];
         }
         const updated = { ...c, effect_blocks: blocks };
         // Aplica bônus de FURIA diretamente — não depende do useEffect para a ativação manual.
@@ -1930,7 +1949,7 @@ export function useBattleState(npc) {
         let updated = { ...c };
         // Injetar keywords pendentes nos effect_blocks
         if (kwdsPendentes.length > 0) {
-          const kwBlocks = kwdsPendentes.map(kw => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: kw }] }] }));
+          const kwBlocks = kwdsPendentes.map(kw => ({ trigger: 'passive', actions: [{ type: 'keyword', effect_reference: [{ slug: kw, behavior_slug: kw }] }] }));
           updated.effect_blocks = [...(updated.effect_blocks ?? []), ...kwBlocks];
         }
         // Aplicar bônus FURIA diretamente se foi uma das keywords injetadas
